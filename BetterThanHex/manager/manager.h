@@ -6,7 +6,8 @@
 #include "../filesystem/filebrowser.h"
 #include "../utils/utils.h"
 #include "../decoder/byte_decoder.h"
-
+#include "../scanner/scanner.h"
+#include <chrono>
 
 static ImVec4 RedFont = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
 static ImVec4 GreenFont = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
@@ -44,17 +45,25 @@ public:
 	void HandleDecoder();
 	ImVec4 GetFont(DecodedInst& inst);
 
+	// Byte Scanner Functions
+	void HandleByteScanner();
+	void HandleByteScannerPopupButton();
+	void HandleByteScannerButton();
+	void HandleByteScannerPopup();
+
+
 
 
 	FileBrowser* m_FileBrowser;
 	Decoder* m_Decoder;
+	Scanner* m_ByteScanner;
 private:
 	
 
-	// FILE SELECT 
+	/*
+		FILE BROWSER
+	*/
 	bool m_bShowFileSelectPopup;
-
-
 
 	/*
 		DECODER
@@ -76,6 +85,22 @@ private:
 	bool m_bHexDumpShowOffsetPopup;
 	char m_HexDumpHexEditorBuffer[3];
 	char m_HexDumpOffsetEditorBuffer[9];
+
+
+	/*
+		BYTE SCANNER
+	*/
+	bool m_bByteShowScannerPopup;
+	bool m_bByteScannerShowPatternEditPopup;
+	int m_ByteScannerInputPatternSize;
+	int m_ByteScannerSelectedIndex;
+	char m_ByteScannerPatternEditorBuffer[3];
+	unsigned char m_ByteScannerPatternBuffer[17];
+	int m_ByteScannerBytesScanned;
+	int m_ByteScannerTimeTaken;
+	float m_ByteScannerProgress;
+	std::vector<unsigned char> m_ByteScannerPattern;
+	std::vector<unsigned int> m_ByteScannerMatches;
 
 	
 

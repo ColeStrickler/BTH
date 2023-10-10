@@ -12,7 +12,7 @@ static std::string ucharToHexString(unsigned char value) {
 	The Manager class is a state machine that handles most of the interactivity of the UI as well as orchestracts
 	classes under the hood that provide the heavy lifting
 */
-Manager::Manager() : m_FileBrowser(new FileBrowser()), m_Decoder(new Decoder()),
+Manager::Manager() : m_FileBrowser(new FileBrowser()), m_Decoder(new Decoder()), m_ByteScanner(new Scanner()),
 	m_HexDumpWidth(475), m_HexDumpHeight(400), m_DecoderWidth(475), m_DecoderHeight(400), m_DecoderNumInstructionsDisplayed(200)
 {
 
@@ -37,7 +37,7 @@ void Manager::RenderUI()
 	}
 	HandleHexdump();
 	
-
+	HandleByteScanner();
 	ImGui::NextColumn();
 	/*
 		COLUMN 2
@@ -81,7 +81,6 @@ void Manager::DisplayFileNavigator()
 	auto& InputPath = m_FileBrowser->m_InputPath;
 	ImGui::InputText("Enter path", InputPath, sizeof(InputPath));
 	m_FileBrowser->ListDirectory(InputPath);
-
 	auto& m_CurrentDirectory = m_FileBrowser->m_CurrentDirectory;
 
 	// Begin a scrollable child window with a fixed height of 300 pixels
@@ -100,7 +99,6 @@ void Manager::DisplayFileNavigator()
 			{
 				m_FileBrowser->SetInputPath(c_str);
 				m_FileBrowser->LoadNewFile(str);
-				// remove this
 				m_Decoder->DecodeBytes(m_FileBrowser->m_FileLoadData);
 			}
 		}
@@ -302,4 +300,150 @@ ImVec4 Manager::GetFont(DecodedInst& inst)
 	}
 	return GreenFont;
 }
+
+void Manager::HandleByteScanner()
+{
+	HandleByteScannerButton();
+	HandleByteScannerPopup();
+}
+
+void Manager::HandleByteScannerPopupButton()
+{
+	if (ImGui::Button("Scan"))
+	{
+		m_ByteScannerProgress = 0.0f;
+
+		m_ByteScannerPattern.clear();
+		for (int i = 0; i < m_ByteScannerInputPatternSize; i++)
+		{
+			m_ByteScannerPattern.push_back(m_ByteScannerPatternBuffer[i]);
+		}
+		m_ByteScannerBytesScanned = m_FileBrowser->m_FileLoadData.size();
+
+
+		auto start_time = std::chrono::high_resolution_clock::now();
+		m_ByteScanner->scan_bytes(m_ByteScannerPattern, m_FileBrowser->m_FileLoadData, &m_ByteScannerProgress);
+		//std::thread(&Scanner::scan_bytes, this->m_ByteScanner, m_ByteScannerPattern, m_FileBrowser->m_FileLoadData, &m_ByteScannerProgress);
+		auto end_time = std::chrono::high_resolution_clock::now();
+		m_ByteScannerTimeTaken = (end_time - start_time).count();
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Close"))
+	{
+		m_bByteShowScannerPopup = false;
+
+	}
+
+
+
+	ImGui::ProgressBar(m_ByteScannerProgress, ImVec2(150, 30));
+	ImGui::Text("Scanned %d bytes in %d ms.", m_ByteScannerBytesScanned, m_ByteScannerTimeTaken);
+	ImGui::Text("Found %d matches.", m_ByteScanner->m_ByteMatches.size());
+
+	for (int i = 0; i < m_ByteScanner->m_ByteMatches.size(); i++)
+	{
+		auto& inst = m_ByteScanner->m_ByteMatches[i];
+		ImGui::TextColored(GreenFont, "0x%x", inst);
+	}
+
+}
+
+void Manager::HandleByteScannerButton()
+{
+	if (ImGui::Button("Byte Scan"))
+	{
+		m_bByteShowScannerPopup = true;
+	}
+
+}
+
+void Manager::HandleByteScannerPopup()
+{
+	if (m_bByteShowScannerPopup)
+	{
+		ImGui::OpenPopup("Byte Scan");
+	}
+
+	if (ImGui::BeginPopup("Byte Scan"))
+	{
+		ImVec2 buttonSize(100, 20); // Adjust the size as needed
+		ImGui::InputInt("Pattern Size:", &m_ByteScannerInputPatternSize, 1, 16);
+		if (m_ByteScannerInputPatternSize > 16)
+			m_ByteScannerInputPatternSize = 16;
+		else if (m_ByteScannerInputPatternSize < 1)
+			m_ByteScannerInputPatternSize = 1;
+
+
+		
+		for (int i = 0; i < m_ByteScannerInputPatternSize; i++)
+		{
+			
+			
+			ImGui::PushID(i);
+
+			auto value = ucharToHexString(m_ByteScannerPatternBuffer[i]);
+			if (ImGui::Button(value.c_str())) {
+				m_ByteScannerSelectedIndex = i;
+				m_bByteScannerShowPatternEditPopup = true;
+			}
+			ImGui::PopID();
+			if (i != 7 && i != m_ByteScannerInputPatternSize - 1)
+				ImGui::SameLine();
+		}
+
+		HandleByteScannerPopupButton();
+		
+		if (!m_bByteShowScannerPopup)
+		{
+			ImGui::CloseCurrentPopup();
+		}
+
+
+
+
+		if (m_bByteScannerShowPatternEditPopup)
+		{
+			ImGui::OpenPopup("Edit Byte");
+		}
+
+		if (ImGui::BeginPopup("Edit Byte"))
+		{
+			ImGui::InputText("Hex Value", m_ByteScannerPatternEditorBuffer, 3);
+			ImGui::Text("Current Value: 0x%x", m_ByteScannerPatternBuffer[m_ByteScannerSelectedIndex]);
+			if (ImGui::Button("Set"))
+			{
+				if (m_HexDumpSelectedIndex != -1)
+				{
+					int newHexValue;
+					unsigned int parsedValue = 0;
+					std::istringstream(m_ByteScannerPatternEditorBuffer) >> std::hex >> parsedValue;
+					m_ByteScannerPatternBuffer[m_ByteScannerSelectedIndex] = static_cast<unsigned char>(parsedValue);
+				}
+
+				ImGui::CloseCurrentPopup();
+				m_bByteScannerShowPatternEditPopup = false;
+				m_ByteScannerSelectedIndex = -1;
+				memset(m_ByteScannerPatternEditorBuffer, 0x00, 2);
+
+			}
+
+			ImGui::EndPopup();
+		}
+
+
+
+
+			
+		ImGui::EndPopup();
+	}
+
+
+	
+
+
+	
+}
+
+
+
 

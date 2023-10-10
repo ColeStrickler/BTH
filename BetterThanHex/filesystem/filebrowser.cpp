@@ -86,11 +86,18 @@ unsigned char* FileBrowser::LoadNewFile(const std::string& filepath)
     m_FileLoadData.clear();
 
     
-    unsigned char byte;
-    while (file.read(reinterpret_cast<char*>(&byte), sizeof(unsigned char))) {
-        m_FileLoadData.push_back(byte);
-    }
-    file.close();
+    // Get the file size for reserving space in the vector
+    file.seekg(0, std::ios::end);
+    std::streampos fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    // Reserve space in the vector
+    m_FileLoadData.reserve(static_cast<size_t>(fileSize));
+
+    // Read the entire file into the vector
+    m_FileLoadData.insert(m_FileLoadData.begin(),
+        std::istreambuf_iterator<char>(file),
+        std::istreambuf_iterator<char>());
     return nullptr;
 }
 
