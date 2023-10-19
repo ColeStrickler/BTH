@@ -12,10 +12,12 @@ static std::string ucharToHexString(unsigned char value) {
 	The Manager class is a state machine that handles most of the interactivity of the UI as well as orchestracts
 	classes under the hood that provide the heavy lifting
 */
-Manager::Manager() : m_FileBrowser(new FileBrowser()), m_Decoder(new Decoder()), m_ByteScanner(new Scanner()),
-	m_HexDumpWidth(475), m_HexDumpHeight(400), m_DecoderWidth(475), m_DecoderHeight(400), m_DecoderNumInstructionsDisplayed(200)
+Manager::Manager() : m_HexDumpWidth(475), m_HexDumpHeight(400), m_DecoderWidth(475), m_DecoderHeight(400), m_DecoderNumInstructionsDisplayed(200),
+					m_MaximumLoadSize(2000)
 {
-
+	m_FileBrowser = new FileBrowser(m_MaximumLoadSize);
+	m_Decoder = new Decoder();
+	m_ByteScanner = new Scanner();
 }
 
 
@@ -81,11 +83,12 @@ void Manager::DisplayFileNavigator()
 	auto& InputPath = m_FileBrowser->m_InputPath;
 	ImGui::InputText("Enter path", InputPath, sizeof(InputPath));
 	m_FileBrowser->ListDirectory(InputPath);
-	auto& m_CurrentDirectory = m_FileBrowser->m_CurrentDirectory;
+	//auto& m_CurrentDirectory = m_FileBrowser->m_CurrentDirectory;
 
 	// Begin a scrollable child window with a fixed height of 300 pixels
 	ImGui::BeginChild("SelectableList", ImVec2(600, 300), true, ImGuiWindowFlags_HorizontalScrollbar);
-	for (const auto& r : m_CurrentDirectory)
+	auto filtered = m_FileBrowser->DisplayFilter();
+	for (const auto& r :  filtered)
 	{
 		auto str = r.path().string();
 		auto c_str = str.c_str();
@@ -98,7 +101,7 @@ void Manager::DisplayFileNavigator()
 			else
 			{
 				m_FileBrowser->SetInputPath(c_str);
-				m_FileBrowser->LoadNewFile(str);
+				m_FileBrowser->LoadFile(str);
 				m_Decoder->DecodeBytes(m_FileBrowser->m_FileLoadData);
 			}
 		}
@@ -121,7 +124,7 @@ int Manager::DrawHexValuesWindow()
 	}
 		
 	bool& showAscii = m_bHexDumpShowAscii;
-	int& offset = m_HexDumpOffsetValue;
+	int& offset = m_GlobalOffset;
 
 	// Create a scrollable region
 	
@@ -136,6 +139,7 @@ int Manager::DrawHexValuesWindow()
 
 	for (int row = 0; row < numRows; ++row) {
 		for (int col = 0; col < bytesPerRow; ++col) {
+			int offset = (m_GlobalOffset - m_FileBrowser->m_CurrentBounds[0]) % m_MaximumLoadSize;
 			int index = row * bytesPerRow + col + offset;
 
 			ImGui::SameLine();
@@ -167,35 +171,8 @@ int Manager::DrawHexValuesWindow()
 }
 void Manager::HandleHexdumpPopups()
 {
-	if (ImGui::Button("Change Offset"))
-	{
-		m_bHexDumpShowOffsetPopup = true;
-	}
 
-	if (m_bHexDumpShowOffsetPopup)
-	{
-		ImGui::OpenPopup("Set Offset");
-	}
 
-	// OFFSET POPUP 
-	if (ImGui::BeginPopup("Set Offset"))
-	{
-		ImGui::InputText("Offset Value", m_HexDumpOffsetEditorBuffer, 9);
-		ImGui::Text("Current Offset: 0x%x", m_HexDumpOffsetValue);
-
-		if (ImGui::Button("Set Offset"))
-		{
-			int newHexValue;
-			unsigned int parsedValue = 0;
-			parsedValue = atoi(m_HexDumpOffsetEditorBuffer);
-			m_HexDumpOffsetValue = parsedValue;
-
-			ImGui::CloseCurrentPopup();
-			m_bHexDumpShowOffsetPopup = false;
-			memset(m_HexDumpOffsetEditorBuffer, 0x00, 8);
-		}
-		ImGui::EndPopup();
-	}
 
 	// HEX EDIT POPUP
 	if (m_bShowHexDumpHexEditPopup)
@@ -231,6 +208,40 @@ void Manager::HandleHexdumpPopups()
 
 void Manager::HandleHexdumpButtons()
 {
+	
+
+	/*
+		Here we grab the input for the offset editor, convert it to hex, and check if it is different than the current offset.
+		If it is, then we call LoadFile to see if we need to load a different portion of the file
+	*/
+	ImGui::SetNextItemWidth(200.0f);
+	ImGui::InputText("Offset", m_OffsetEditorBuffer, sizeof(m_OffsetEditorBuffer), ImGuiInputTextFlags_CharsHexadecimal);
+	std::string offset(m_OffsetEditorBuffer);
+	int new_offset = utils::stringToHex(offset);
+
+
+	// We check to see if we need to load a different portion of the file when the offset changes
+	if (m_GlobalOffset != new_offset)
+	{
+		m_GlobalOffset = new_offset;
+		auto parse_inst = m_FileBrowser->LoadFile(m_FileBrowser->m_LoadedFileName, m_GlobalOffset);
+		if (parse_inst == (unsigned char*)0x1)
+		{
+			
+			m_Decoder->DecodeBytes(m_FileBrowser->m_FileLoadData);
+		}
+	}
+	
+	ImGui::Text("Loaded File: %s\t File Size: %x\n", m_FileBrowser->m_LoadedFileName.c_str(), m_FileBrowser->m_LoadedFileSize);
+	
+	// Show error message if offset is bigger than file
+	if (m_GlobalOffset > m_FileBrowser->m_LoadedFileSize)
+	{
+		
+		ImGui::TextColored(RedFont, "[ERROR]: Offset of %x is larger than file size.", m_GlobalOffset);
+	}
+
+	// ASCII Button
 	if (m_bHexDumpShowAscii)
 	{
 		if (ImGui::Button("Show Hex"))
@@ -245,6 +256,7 @@ void Manager::HandleHexdumpButtons()
 			m_bHexDumpShowAscii = !m_bHexDumpShowAscii;
 		}
 	}
+	ImGui::SameLine();
 }
 
 void Manager::HandleHexdump()
@@ -271,17 +283,15 @@ void Manager::HandleDecoder()
 	ImGui::Dummy(buttonSize); // Add 10 units of padding
 	ImGui::BeginChild("DisassemblyRegion", ImVec2(m_DecoderWidth, m_DecoderHeight), true);
 
-	auto offset = m_Decoder->m_OffsetToInstIndex[m_DecoderOffset];
+	auto offset = m_Decoder->m_OffsetToInstIndex[m_GlobalOffset];
 
 	for (int i = offset; i < offset + m_DecoderNumInstructionsDisplayed
 		&& i < m_Decoder->m_DecodedBytes.size() ; i++)
 	{
 		auto& inst = m_Decoder->m_DecodedBytes[i];
-		ImGui::TextColored(GetFont(inst), "0x%x: %s", inst.m_Offset, inst.m_DecodedInstruction.c_str());
+		ImGui::TextColored(GetFont(inst), "0x%x: %s", inst.m_Offset + (m_GlobalOffset > m_MaximumLoadSize ? m_GlobalOffset : 0), inst.m_DecodedInstruction.c_str());
 	}
 	ImGui::EndChild();
-	ImGui::Text("Offset: 0x%x", m_DecoderOffset);
-	ImGui::InputInt("Set Offset:", &m_DecoderOffset);
 }
 
 ImVec4 Manager::GetFont(DecodedInst& inst)
@@ -325,7 +335,7 @@ void Manager::HandleByteScannerPopupButton()
 		m_ByteScanner->scan_bytes(m_ByteScannerPattern, m_FileBrowser->m_FileLoadData, &m_ByteScannerProgress);
 		//std::thread(&Scanner::scan_bytes, this->m_ByteScanner, m_ByteScannerPattern, m_FileBrowser->m_FileLoadData, &m_ByteScannerProgress);
 		auto end_time = std::chrono::high_resolution_clock::now();
-		m_ByteScannerTimeTaken = (end_time - start_time).count();
+		m_ByteScannerTimeTaken = end_time - start_time;
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("Close"))
@@ -337,7 +347,7 @@ void Manager::HandleByteScannerPopupButton()
 
 
 	ImGui::ProgressBar(m_ByteScannerProgress, ImVec2(150, 30));
-	ImGui::Text("Scanned %d bytes in %d ms.", m_ByteScannerBytesScanned, m_ByteScannerTimeTaken);
+	ImGui::Text("Scanned %d bytes in %.2f ms.", m_ByteScannerBytesScanned, m_ByteScannerTimeTaken.count());
 	ImGui::Text("Found %d matches.", m_ByteScanner->m_ByteMatches.size());
 
 	for (int i = 0; i < m_ByteScanner->m_ByteMatches.size(); i++)
@@ -430,18 +440,11 @@ void Manager::HandleByteScannerPopup()
 			ImGui::EndPopup();
 		}
 
-
-
-
-			
+	
 		ImGui::EndPopup();
 	}
 
 
-	
-
-
-	
 }
 
 

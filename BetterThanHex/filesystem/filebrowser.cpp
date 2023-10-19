@@ -1,6 +1,6 @@
 #include "filebrowser.h"
 
-FileBrowser::FileBrowser() : m_InputPath("")
+FileBrowser::FileBrowser(size_t MaxLoadSize) : m_InputPath(""), m_MaxLoadSize(MaxLoadSize)
 {
 }
 
@@ -47,21 +47,22 @@ std::vector<std::string> FileBrowser::CurrentDirectoryToStringVec()
 
 }
 
-std::vector<std::string> FileBrowser::DisplayFilter(std::vector<std::string>& unfiltered)
+std::vector<fs::directory_entry> FileBrowser::DisplayFilter()
 {
-    std::vector<std::string> ret;
+    std::vector<fs::directory_entry> ret;
     std::string input(m_InputPath);
 
-    for (auto& s : unfiltered)
+    for (auto& s : m_CurrentDirectory)
     {
-        if (s.size() < input.size())
+        auto str = s.path().string();
+        if (str.size() < input.size())
         {
             continue;
         }
         bool skip = false;
-        for (int i = 0; i < input.size(); i++)
+        for (int i = input.size()-1; i >= 0; i--)
         {
-            if (input[i] != s[i])
+            if (str[i] != input[i])
             {
                 skip = true;
                 break;
@@ -71,34 +72,61 @@ std::vector<std::string> FileBrowser::DisplayFilter(std::vector<std::string>& un
         {
             ret.push_back(s);
         }
-        return ret;
     }
 
-
+    return ret;
 }
 
-unsigned char* FileBrowser::LoadNewFile(const std::string& filepath)
+unsigned char* FileBrowser::LoadFile(const std::string& filepath, const size_t& offset)
 {
+    if (m_LoadedFileName == filepath && filepath.size() && offset >= m_CurrentBounds[0] && offset < m_CurrentBounds[1])
+    {
+        return nullptr;
+    }
+
     std::ifstream file(filepath, std::ios::binary);
     if (!file.is_open()) {
         return nullptr;
     }
-    m_FileLoadData.clear();
+    
 
     
     // Get the file size for reserving space in the vector
+    
     file.seekg(0, std::ios::end);
     std::streampos fileSize = file.tellg();
-    file.seekg(0, std::ios::beg);
+    if (offset > fileSize)
+    {
+        m_CurrentBounds[0] = 0;
+        m_CurrentBounds[1] = 1;
+        // just reset
+        file.close();
+        return nullptr;
+    }
+    file.seekg(offset, std::ios::beg);
+
+
+
+
+    unsigned long loadSize = (static_cast<size_t>(fileSize) - offset) > m_MaxLoadSize ? m_MaxLoadSize : (static_cast<size_t>(fileSize) - offset);
+    m_CurrentBounds[0] = offset;
+    m_CurrentBounds[1] =  offset + loadSize; // this will store the offsets to the portion of the file currently loaded
+    m_LoadedFileName = filepath;
+    m_LoadedFileSize = fileSize;
+
+
 
     // Reserve space in the vector
-    m_FileLoadData.reserve(static_cast<size_t>(fileSize));
+    m_FileLoadData.clear(); // clear the old data out
+    //m_FileLoadData.reserve(loadSize);
+    // Read the entire file into the vector(char*)m_FileLoadData.data()
 
-    // Read the entire file into the vector
-    m_FileLoadData.insert(m_FileLoadData.begin(),
-        std::istreambuf_iterator<char>(file),
-        std::istreambuf_iterator<char>());
-    return nullptr;
+    utils::NewBuffer buffer(loadSize);
+    file.read(reinterpret_cast<char*>(buffer.Get()), loadSize);
+    auto tmp = std::vector<unsigned char>(buffer.Get(), buffer.Get() + loadSize);
+    m_FileLoadData = tmp;
+    file.close();
+    return (unsigned char*)0x1;
 }
 
 void FileBrowser::SetInputPath(const std::string& new_inputpath)

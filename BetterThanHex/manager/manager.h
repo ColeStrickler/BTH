@@ -58,7 +58,15 @@ public:
 	Decoder* m_Decoder;
 	Scanner* m_ByteScanner;
 private:
-	
+	/*
+		GLOBAL STATE
+	*/
+	int m_GlobalOffset;
+	char m_OffsetEditorBuffer[9];
+	int m_MaximumLoadSize;	// the maximum amount of a file we can load at a time
+
+
+
 
 	/*
 		FILE BROWSER
@@ -70,7 +78,6 @@ private:
 	*/
 	int m_DecoderWidth;
 	int m_DecoderHeight;
-	int m_DecoderOffset;
 	int m_DecoderNumInstructionsDisplayed;
 
 	/*
@@ -81,10 +88,8 @@ private:
 	bool m_bHexDumpShowAscii;
 	bool m_bShowHexDumpHexEditPopup;
 	int m_HexDumpSelectedIndex;
-	int m_HexDumpOffsetValue;
-	bool m_bHexDumpShowOffsetPopup;
 	char m_HexDumpHexEditorBuffer[3];
-	char m_HexDumpOffsetEditorBuffer[9];
+
 
 
 	/*
@@ -97,7 +102,7 @@ private:
 	char m_ByteScannerPatternEditorBuffer[3];
 	unsigned char m_ByteScannerPatternBuffer[17];
 	int m_ByteScannerBytesScanned;
-	int m_ByteScannerTimeTaken;
+	std::chrono::duration<double> m_ByteScannerTimeTaken;
 	float m_ByteScannerProgress;
 	std::vector<unsigned char> m_ByteScannerPattern;
 	std::vector<unsigned int> m_ByteScannerMatches;

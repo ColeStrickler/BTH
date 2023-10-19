@@ -34,6 +34,10 @@ std::vector<unsigned int> Scanner::simple_scan(const std::vector<unsigned char>&
 
 /*
 	scan_bytes is a Boyer-Moore implementation
+
+
+	We will need to set this up to work with the dynamic file offset loading
+
 */
 std::vector<long long int> Scanner::scan_bytes(const std::vector<unsigned char>& pattern, const std::vector<unsigned char>& bytes, float* progress)
 {
