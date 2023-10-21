@@ -13,7 +13,7 @@ static std::string ucharToHexString(unsigned char value) {
 	classes under the hood that provide the heavy lifting
 */
 Manager::Manager() : m_HexDumpWidth(475), m_HexDumpHeight(400), m_DecoderWidth(475), m_DecoderHeight(400), m_DecoderNumInstructionsDisplayed(200),
-					m_MaximumLoadSize(2000)
+					m_MaximumLoadSize(20000)
 {
 	m_FileBrowser = new FileBrowser(m_MaximumLoadSize);
 	m_Decoder = new Decoder();
@@ -24,7 +24,6 @@ Manager::Manager() : m_HexDumpWidth(475), m_HexDumpHeight(400), m_DecoderWidth(4
 void Manager::RenderUI()
 {
 	ImGui::Columns(2);
-
 
 	/*
 		COLUMN 1
