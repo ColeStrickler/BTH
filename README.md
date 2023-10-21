@@ -10,6 +10,5 @@
 # To DO
 - Fix Progress Bar for Byte scanner
 - add support for dynamic offsets into scanner
-- integrate PE dissector class(this is mostly done, just on my laptop)
-
+- finish up PE parser and integrate into GUI
 ![progress](https://github.com/ColeStrickler/BetterThanHex/assets/82488869/be8f0914-bf2a-4475-b90a-b6c9225ea270)
