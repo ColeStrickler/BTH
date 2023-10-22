@@ -15,4 +15,4 @@
 
 ## Its coming along - need to start making it prettier
 
-![coming along](https://github.com/ColeStrickler/BetterThanHex/assets/82488869/d95373ce-e952-4b3b-868e-5e1696668a09)
+![prettier](https://github.com/ColeStrickler/BetterThanHex/assets/82488869/7a292ad1-f120-47ca-9736-62e537c81e2f)
