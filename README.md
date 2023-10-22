@@ -11,4 +11,8 @@
 - Fix Progress Bar for Byte scanner
 - add support for dynamic offsets into scanner
 - finish up PE parser and integrate into GUI
-![progress](https://github.com/ColeStrickler/BetterThanHex/assets/82488869/be8f0914-bf2a-4475-b90a-b6c9225ea270)
+
+
+## Its coming along - need to start making it prettier
+
+![coming along](https://github.com/ColeStrickler/BetterThanHex/assets/82488869/d95373ce-e952-4b3b-868e-5e1696668a09)
