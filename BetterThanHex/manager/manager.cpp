@@ -8,7 +8,7 @@ static std::string ucharToHexString(unsigned char value) {
 
 
 static std::string ucharVecToHexString(std::vector<unsigned char>& vec)
-{
+ {
 	std::string ret;
 	for (auto& c : vec)
 	{
@@ -23,8 +23,8 @@ static std::string ucharVecToHexString(std::vector<unsigned char>& vec)
 	The Manager class is a state machine that handles most of the interactivity of the UI as well as orchestracts
 	classes under the hood that provide the heavy lifting
 */
-Manager::Manager() : m_HexDumpWidth(475), m_HexDumpHeight(400), m_DecoderWidth(475), m_DecoderHeight(400), m_DecoderNumInstructionsDisplayed(200),
-					m_MaximumLoadSize(200000)
+Manager::Manager() : m_HexDumpWidth(475), m_HexDumpHeight(400), m_DecoderWidth(475), m_DecoderHeight(400), m_PEtableWidth(1600), m_PEtableHeight(500),
+					m_DecoderNumInstructionsDisplayed(200), m_MaximumLoadSize(200000)
 {
 	m_FileBrowser = new FileBrowser(m_MaximumLoadSize);
 	m_Decoder = new Decoder();
@@ -546,7 +546,7 @@ void Manager::HandlePeDisplay()
 		case PEINFO::DOS_HEADER:
 			HandleDosHeader();
 		case PEINFO::RICH_HEADER:
-			return;
+			HandleRichHeader();
 		case PEINFO::FILE_HEADER:	
 			return;
 		case PEINFO::NT_HEADER:
@@ -574,6 +574,17 @@ void Manager::HandleDosHeader()
 	}
 }
 
+void Manager::HandleRichHeader()
+{
+	auto key = m_PEDisector->m_ParsedRichHeader.key;
+
+	ImGui::Text("Rich Header Key: %x %x %x %x\n", key[0], key[1], key[2], key[3]);
+	for (auto& e : m_PEDisector->m_ParsedRichHeader.m_Entries)
+	{
+		ImGui::Text(RichHdr_ProdIdToVSversion(e.m_prodID).c_str());
+	}
+}
+
 void Manager::HandleNtHeader()
 {
 	for (auto& e : m_PEDisector->m_ParsedOptionalHeader)
@@ -586,28 +597,77 @@ void Manager::HandleNtHeader()
 
 void Manager::HandleImports()
 {
-	int i = 0;
 	ImGui::Columns(2);
-	for (auto& e : m_PEDisector->m_ParsedImports)
+	ImGui::BeginChild("PEtableRegion1", ImVec2(m_PEtableWidth/2, m_PEtableHeight), true);
+	int x = 0;
+	auto& imports = m_PEDisector->m_ParsedImports;
+	auto first_lib_ex = imports[0];
+
+	if (ImGui::BeginTable("Functions", 7))
 	{
-		if (ImGui::Selectable(e.m_Library.c_str()))
+		ImGui::TableSetupColumn("Library");
+		ImGui::TableSetupColumn("Characteristics");
+		ImGui::TableSetupColumn("OrginalFirstThunk");
+		ImGui::TableSetupColumn("TimeDateStamp");
+		ImGui::TableSetupColumn("ForwarderChain");
+		ImGui::TableSetupColumn("Name");
+		ImGui::TableSetupColumn("FirstThunk");
+		ImGui::TableHeadersRow();
+
+		
+		for (int row = 0; row < imports.size(); row++)
 		{
-			m_PEselectedImportView = i;
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			if (ImGui::Selectable(imports[row].m_Library.c_str()))
+			{
+				m_PEselectedImportView = x;
+			}
+			x++;
+			for (int column = 1; column < 7; column++)
+			{
+				ImGui::TableSetColumnIndex(column);
+				ImGui::Text(ucharVecToHexString(imports[row].m_ImportDescriptorData[column-1].m_Bytes).c_str());
+			}
+
 		}
-		i++;
+		ImGui::EndTable();
 	}
+	ImGui::EndChild();
+	
 	ImGui::NextColumn();
+	
+	
+	ImGui::BeginChild("PEtableRegion2", ImVec2(m_PEtableWidth/2, m_PEtableHeight), true);
+	
 	if (m_PEselectedImportView < m_PEDisector->m_ParsedImports.size())
 	{
-		
-		for (auto& i : m_PEDisector->m_ParsedImports[m_PEselectedImportView].m_FunctionImports)
+		auto& selected = m_PEDisector->m_ParsedImports[m_PEselectedImportView].m_FunctionImports;
+		auto num_cols = selected.size() ? selected[0].m_ImportInfo.size() : 0;
+		if (ImGui::BeginTable("Functions", 3))
 		{
-			ImGui::Text(i.m_FunctionName.c_str());
-			//ImGui::Spacing();
-			//ImGui::SameLine();
-			// Will need to add descriptor data here i.m_DescriptorData
+			ImGui::TableSetupColumn("Function");
+			ImGui::TableSetupColumn("Thunk");
+			ImGui::TableSetupColumn("Hint");
+			ImGui::TableHeadersRow();
+			if (num_cols)
+			{
+				for (int row = 0; row < selected.size(); row++)
+				{
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text(selected[row].m_FunctionName.c_str());
+					for (int column = 1; column < 3; column++)
+					{
+						ImGui::TableSetColumnIndex(column);
+						ImGui::Text(ucharVecToHexString(selected[row].m_ImportInfo[column - 1].m_Bytes).c_str());
+					}
+				}
+			}	
+			ImGui::EndTable();
 		}
 	}
-
+	
+	ImGui::EndChild();
 }
 

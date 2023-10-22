@@ -5,8 +5,8 @@
 #include "UI/ui.h"
 #include "manager/manager.h"
 
-#define WINDOW_WIDTH 950
-#define WINDOW_HEIGHT 800
+#define WINDOW_WIDTH 1600
+#define WINDOW_HEIGHT 1000
 #define ASSERT(x) if(!(x)) __debugbreak();
 
 bool GLLogCall(const char* func, const char* file, int line)

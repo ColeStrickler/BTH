@@ -386,38 +386,96 @@ void PEDisector::ParseImports32(PIMAGE_DOS_HEADER dos, std::ifstream& file)
 {
 	unsigned char* Base = (unsigned char*)dos;
 	PIMAGE_IMPORT_DESCRIPTOR iDescriptor = nullptr;
+	IMAGE_IMPORT_DESCRIPTOR descriptor;
 	auto nt = (PIMAGE_NT_HEADERS32)((unsigned char*)dos + dos->e_lfanew);
 	auto pSectionHeader = IMAGE_FIRST_SECTION(nt);
 	int numSections = nt->FileHeader.NumberOfSections;
 	if (nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size)
 	{
-		iDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)(Base + Rva2Offset32(nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress, pSectionHeader, nt));
-		while (iDescriptor->Name != NULL)
+		/*
+			We need to check to make sure we are not accessing out of bounds offsets, if it is out of bounds, we will use our
+			utility function to read the data from the file there
+		*/
+		auto iDescriptorOffset = (size_t)Rva2Offset32(nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress, pSectionHeader, nt);
+		if (iDescriptorOffset > INITIAL_PE_LOAD)
+			utils::readFromFileOffset(file, iDescriptorOffset, sizeof(IMAGE_IMPORT_DESCRIPTOR), &descriptor);
+		else
 		{
-			std::string library(((char*)(Rva2Offset32(iDescriptor->Name, pSectionHeader, nt) + Base)));
-			auto thunkILT = (PIMAGE_THUNK_DATA32)(Base + Rva2Offset32(iDescriptor->OriginalFirstThunk, pSectionHeader, nt));
+			iDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)(Base + iDescriptorOffset);
+			descriptor = *iDescriptor;
+		}
+
+		while (descriptor.Name != NULL)
+		{
 			fh_LibraryImport libImport;
+			fhInsertEntry((unsigned char*)&descriptor.Characteristics, sizeof(descriptor.Characteristics), "Characteristics", libImport.m_ImportDescriptorData);
+			fhInsertEntry((unsigned char*)&descriptor.OriginalFirstThunk, sizeof(descriptor.OriginalFirstThunk), "OriginalFirstThunk", libImport.m_ImportDescriptorData);
+			fhInsertEntry((unsigned char*)&descriptor.TimeDateStamp, sizeof(descriptor.TimeDateStamp), "TimeDateStamp", libImport.m_ImportDescriptorData);
+			fhInsertEntry((unsigned char*)&descriptor.ForwarderChain, sizeof(descriptor.ForwarderChain), "ForwarderChain", libImport.m_ImportDescriptorData);
+			fhInsertEntry((unsigned char*)&descriptor.Name, sizeof(descriptor.Name), "Name", libImport.m_ImportDescriptorData);
+			fhInsertEntry((unsigned char*)&descriptor.FirstThunk, sizeof(descriptor.FirstThunk), "FirstThunk", libImport.m_ImportDescriptorData);
+
+			auto libNameOffset = Rva2Offset32(descriptor.Name, pSectionHeader, nt);
+			std::string library;
+			if (libNameOffset > INITIAL_PE_LOAD)
+				utils::readStringFromFileOffset(file, libNameOffset, library);
+			else
+				library = std::string((char*)(libNameOffset + Base));
+
+			IMAGE_THUNK_DATA32 thunkData;
+			auto thunkOffset = Rva2Offset32(descriptor.OriginalFirstThunk, pSectionHeader, nt);
+
+			if (thunkOffset > INITIAL_PE_LOAD)
+				utils::readFromFileOffset(file, thunkOffset, sizeof(IMAGE_THUNK_DATA32), &thunkData);
+			else
+			{
+				auto thunkILT = (PIMAGE_THUNK_DATA32)(Base + thunkOffset);
+				thunkData = *thunkILT;
+			}
+
 			libImport.m_Library = library;
-			while (thunkILT->u1.AddressOfData != 0)
+			while (thunkData.u1.AddressOfData != 0)
 			{
 				fh_FunctionImport funcImport;
-				if (!(thunkILT->u1.Ordinal & IMAGE_ORDINAL_FLAG32))
+				if (!(thunkData.u1.Ordinal & IMAGE_ORDINAL_FLAG32))
 				{
-					PIMAGE_IMPORT_BY_NAME nameArray = (PIMAGE_IMPORT_BY_NAME)(Rva2Offset32(thunkILT->u1.AddressOfData, pSectionHeader, nt));
-					std::string function((char*)(Base + (DWORD)nameArray->Name));
+
+					// Messing up here, we arent reading in the function names correctly
+					WORD hint;
+					std::string function;
+
+					auto nameArrayOffset = Rva2Offset32(thunkData.u1.AddressOfData, pSectionHeader, nt);
+					if (nameArrayOffset > INITIAL_PE_LOAD)
+					{
+						utils::readStringFromFileOffset(file, nameArrayOffset + sizeof(WORD), function);
+						utils::readFromFileOffset(file, nameArrayOffset, sizeof(WORD), &hint);
+					}
+					else
+					{
+						PIMAGE_IMPORT_BY_NAME nameArray = (PIMAGE_IMPORT_BY_NAME)(Base + nameArrayOffset);
+						hint = nameArray->Hint;
+						function = std::string((char*)(nameArray->Name));
+					}
+
 					funcImport.m_FunctionName = function;
-					fhInsertEntry((unsigned char*)&iDescriptor->Characteristics, sizeof(iDescriptor->Characteristics), "Characteristics", funcImport.m_ImportDescriptorData);
-					fhInsertEntry((unsigned char*)&iDescriptor->OriginalFirstThunk, sizeof(iDescriptor->OriginalFirstThunk), "OriginalFirstThunk", funcImport.m_ImportDescriptorData);
-					fhInsertEntry((unsigned char*)&iDescriptor->TimeDateStamp, sizeof(iDescriptor->TimeDateStamp), "TimeDateStamp", funcImport.m_ImportDescriptorData);
-					fhInsertEntry((unsigned char*)&iDescriptor->ForwarderChain, sizeof(iDescriptor->ForwarderChain), "ForwarderChain", funcImport.m_ImportDescriptorData);
-					fhInsertEntry((unsigned char*)&iDescriptor->Name, sizeof(iDescriptor->Name), "Name", funcImport.m_ImportDescriptorData);
-					fhInsertEntry((unsigned char*)&iDescriptor->FirstThunk, sizeof(iDescriptor->FirstThunk), "FirstThunk", funcImport.m_ImportDescriptorData);
-					libImport.m_FunctionImports.push_back(funcImport); // move this later
+					fhInsertEntry((unsigned char*)&thunkData.u1.AddressOfData, sizeof(IMAGE_THUNK_DATA32), "Thunk", funcImport.m_ImportInfo);
+					fhInsertEntry((unsigned char*)&hint, sizeof(WORD), "Hint", funcImport.m_ImportInfo);
+					libImport.m_FunctionImports.push_back(funcImport);
 				}
-				thunkILT++;
+
+				thunkOffset += sizeof(DWORD);
+				utils::readFromFileOffset(file, thunkOffset, sizeof(IMAGE_THUNK_DATA32), &thunkData);
 			}
 			m_ParsedImports.push_back(libImport);
-			iDescriptor++;
+
+			iDescriptorOffset += sizeof(IMAGE_IMPORT_DESCRIPTOR);
+			if (iDescriptorOffset > INITIAL_PE_LOAD)
+				utils::readFromFileOffset(file, iDescriptorOffset, sizeof(IMAGE_IMPORT_DESCRIPTOR), &descriptor);
+			else
+			{
+				iDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)(Base + iDescriptorOffset);
+				descriptor = *iDescriptor;
+			}
 		}
 	}
 }
@@ -447,8 +505,14 @@ void PEDisector::ParseImports64(PIMAGE_DOS_HEADER dos, std::ifstream& file)
 
 		while (descriptor.Name != NULL)
 		{
-			
-			//printf("0x%x\n", Rva2Offset(descriptor.Name, pSectionHeader, nt));
+			fh_LibraryImport libImport;
+			fhInsertEntry((unsigned char*)&descriptor.Characteristics, sizeof(descriptor.Characteristics), "Characteristics",			libImport.m_ImportDescriptorData);
+			fhInsertEntry((unsigned char*)&descriptor.OriginalFirstThunk, sizeof(descriptor.OriginalFirstThunk), "OriginalFirstThunk",	libImport.m_ImportDescriptorData);
+			fhInsertEntry((unsigned char*)&descriptor.TimeDateStamp, sizeof(descriptor.TimeDateStamp), "TimeDateStamp",					libImport.m_ImportDescriptorData);
+			fhInsertEntry((unsigned char*)&descriptor.ForwarderChain, sizeof(descriptor.ForwarderChain), "ForwarderChain",				libImport.m_ImportDescriptorData);
+			fhInsertEntry((unsigned char*)&descriptor.Name, sizeof(descriptor.Name), "Name",											libImport.m_ImportDescriptorData);
+			fhInsertEntry((unsigned char*)&descriptor.FirstThunk, sizeof(descriptor.FirstThunk), "FirstThunk",							libImport.m_ImportDescriptorData);
+
 			auto libNameOffset = Rva2Offset(descriptor.Name, pSectionHeader, nt);
 			std::string library;
 			if (libNameOffset > INITIAL_PE_LOAD)
@@ -456,13 +520,8 @@ void PEDisector::ParseImports64(PIMAGE_DOS_HEADER dos, std::ifstream& file)
 			else
 				library = std::string ((char*)(libNameOffset + Base));
 
-		
-			/*
-		
-			*/
 			IMAGE_THUNK_DATA thunkData;
 			auto thunkOffset = Rva2Offset(descriptor.OriginalFirstThunk, pSectionHeader, nt);
-
 
 			if (thunkOffset > INITIAL_PE_LOAD)
 				utils::readFromFileOffset(file, thunkOffset, sizeof(ULONGLONG), &thunkData);
@@ -471,8 +530,7 @@ void PEDisector::ParseImports64(PIMAGE_DOS_HEADER dos, std::ifstream& file)
 				auto thunkILT = (PIMAGE_THUNK_DATA)(Base + thunkOffset);
 				thunkData = *thunkILT;
 			}
-				
-			fh_LibraryImport libImport;
+					
 			libImport.m_Library = library;
 			while (thunkData.u1.AddressOfData != 0)
 			{
@@ -481,27 +539,26 @@ void PEDisector::ParseImports64(PIMAGE_DOS_HEADER dos, std::ifstream& file)
 				{
 
 					// Messing up here, we arent reading in the function names correctly
-					IMAGE_IMPORT_BY_NAME ibName;
-					
+					WORD hint;
 					std::string function;
 
 					auto nameArrayOffset = Rva2Offset(thunkData.u1.AddressOfData, pSectionHeader, nt);
 					if (nameArrayOffset > INITIAL_PE_LOAD)
+					{
 						utils::readStringFromFileOffset(file, nameArrayOffset + sizeof(WORD), function);
+						utils::readFromFileOffset(file, nameArrayOffset, sizeof(WORD), &hint);
+					}	
 					else
 					{
 						PIMAGE_IMPORT_BY_NAME nameArray = (PIMAGE_IMPORT_BY_NAME)(Base + nameArrayOffset);
+						hint = nameArray->Hint;
 						function = std::string((char*)(nameArray->Name));
 					}
 					
 					funcImport.m_FunctionName = function;
-					fhInsertEntry((unsigned char*)&descriptor.Characteristics, sizeof(descriptor.Characteristics), "Characteristics", funcImport.m_ImportDescriptorData);
-					fhInsertEntry((unsigned char*)&descriptor.OriginalFirstThunk, sizeof(descriptor.OriginalFirstThunk), "OriginalFirstThunk", funcImport.m_ImportDescriptorData);
-					fhInsertEntry((unsigned char*)&descriptor.TimeDateStamp, sizeof(descriptor.TimeDateStamp), "TimeDateStamp", funcImport.m_ImportDescriptorData);
-					fhInsertEntry((unsigned char*)&descriptor.ForwarderChain, sizeof(descriptor.ForwarderChain), "ForwarderChain", funcImport.m_ImportDescriptorData);
-					fhInsertEntry((unsigned char*)&descriptor.Name, sizeof(descriptor.Name), "Name", funcImport.m_ImportDescriptorData);
-					fhInsertEntry((unsigned char*)&descriptor.FirstThunk, sizeof(descriptor.FirstThunk), "FirstThunk", funcImport.m_ImportDescriptorData);
-					libImport.m_FunctionImports.push_back(funcImport); // move this later
+					fhInsertEntry((unsigned char*)&thunkData.u1.AddressOfData, sizeof(ULONGLONG), "Thunk", funcImport.m_ImportInfo);
+					fhInsertEntry((unsigned char*)&hint, sizeof(WORD), "Hint", funcImport.m_ImportInfo);
+					libImport.m_FunctionImports.push_back(funcImport); 
 				}
 				
 				thunkOffset += sizeof(PIMAGE_THUNK_DATA);
@@ -517,8 +574,6 @@ void PEDisector::ParseImports64(PIMAGE_DOS_HEADER dos, std::ifstream& file)
 				iDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)(Base + iDescriptorOffset);
 				descriptor = *iDescriptor;
 			}
-
-
 		}
 	}
 }
@@ -563,6 +618,7 @@ void PEDisector::ParseRichHeader(PIMAGE_DOS_HEADER dos)
 	// Grab the decryption key while we're here
 	char key[4];
 	memcpy(&key, richBuffer + (index + 4), 4);
+	memcpy(m_ParsedRichHeader.key, richBuffer + (index + 4), 4);
 	int size = 0; 
 	index -= 4;
 	

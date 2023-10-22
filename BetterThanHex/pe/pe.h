@@ -34,7 +34,7 @@ struct fh_Section
 struct fh_FunctionImport
 {
 	std::string m_FunctionName;
-	std::vector<fh_Entry> m_ImportDescriptorData;
+	std::vector<fh_Entry> m_ImportInfo;
 };
 
 
@@ -42,6 +42,7 @@ struct fh_FunctionImport
 struct fh_LibraryImport
 {
 	std::string m_Library;
+	std::vector<fh_Entry> m_ImportDescriptorData;
 	std::vector<fh_FunctionImport> m_FunctionImports;
 };
 
@@ -80,6 +81,11 @@ public:
 	void ParseSectionHeaders(PIMAGE_DOS_HEADER dos);
 	void ParseSectionHeaders32(PIMAGE_DOS_HEADER dos);
 	void ParseSectionHeaders64(PIMAGE_DOS_HEADER dos);
+
+
+	/*
+		We currently are not supporting ordinal imports, we will add this soon
+	*/
 	void ParseImports(PIMAGE_DOS_HEADER dos, std::ifstream& file);
 	void ParseImports32(PIMAGE_DOS_HEADER dos, std::ifstream& file);
 	void ParseImports64(PIMAGE_DOS_HEADER dos, std::ifstream& file);

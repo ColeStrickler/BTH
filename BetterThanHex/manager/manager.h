@@ -73,7 +73,7 @@ public:
 	void HandlePeFileFormatButtons();
 	void HandlePeDisplay();
 	void HandleDosHeader();
-
+	void HandleRichHeader();
 	void HandleNtHeader();
 
 	void HandleImports();
@@ -138,6 +138,8 @@ private:
 	/*
 		PE PARSER
 	*/
+	int m_PEtableWidth;
+	int m_PEtableHeight;
 	PEINFO m_PEselected;
 	int m_PEselectedImportView;
 
