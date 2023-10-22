@@ -491,7 +491,7 @@ void PEDisector::ParseImports64(PIMAGE_DOS_HEADER dos, std::ifstream& file)
 					else
 					{
 						PIMAGE_IMPORT_BY_NAME nameArray = (PIMAGE_IMPORT_BY_NAME)(Base + nameArrayOffset);
-						function = std::string((char*)(Base + (DWORD)nameArray->Name));
+						function = std::string((char*)(nameArray->Name));
 					}
 					
 					funcImport.m_FunctionName = function;

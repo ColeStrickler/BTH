@@ -139,6 +139,7 @@ private:
 		PE PARSER
 	*/
 	PEINFO m_PEselected;
+	int m_PEselectedImportView;
 
 	
 

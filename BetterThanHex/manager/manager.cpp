@@ -586,21 +586,28 @@ void Manager::HandleNtHeader()
 
 void Manager::HandleImports()
 {
+	int i = 0;
 	ImGui::Columns(2);
 	for (auto& e : m_PEDisector->m_ParsedImports)
 	{
 		if (ImGui::Selectable(e.m_Library.c_str()))
 		{
-			ImGui::NextColumn();
-			for (auto& i : e.m_FunctionImports)
-			{
-				ImGui::Text(i.m_FunctionName.c_str());
-				//ImGui::Spacing();
-				//ImGui::SameLine();
-				// Will need to add descriptor data here i.m_DescriptorData
-			}
-			ImGui::NextColumn();
+			m_PEselectedImportView = i;
+		}
+		i++;
+	}
+	ImGui::NextColumn();
+	if (m_PEselectedImportView < m_PEDisector->m_ParsedImports.size())
+	{
+		
+		for (auto& i : m_PEDisector->m_ParsedImports[m_PEselectedImportView].m_FunctionImports)
+		{
+			ImGui::Text(i.m_FunctionName.c_str());
+			//ImGui::Spacing();
+			//ImGui::SameLine();
+			// Will need to add descriptor data here i.m_DescriptorData
 		}
 	}
+
 }
 
