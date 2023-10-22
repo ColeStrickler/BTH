@@ -77,16 +77,16 @@ std::vector<fs::directory_entry> FileBrowser::DisplayFilter()
     return ret;
 }
 
-unsigned char* FileBrowser::LoadFile(const std::string& filepath, const size_t& offset)
+FB_RETCODE FileBrowser::LoadFile(const std::string& filepath, const size_t& offset)
 {
     if (m_LoadedFileName == filepath && filepath.size() && offset >= m_CurrentBounds[0] && offset < m_CurrentBounds[1])
     {
-        return nullptr;
+        return FB_RETCODE::NO_CHANGE_LOAD;
     }
 
     std::ifstream file(filepath, std::ios::binary);
     if (!file.is_open()) {
-        return nullptr;
+        return FB_RETCODE::FILE_ERROR_LOAD;
     }
     
 
@@ -101,13 +101,13 @@ unsigned char* FileBrowser::LoadFile(const std::string& filepath, const size_t& 
         m_CurrentBounds[1] = 1;
         // just reset
         file.close();
-        return nullptr;
+        return FB_RETCODE::FILE_ERROR_LOAD;
     }
     file.seekg(offset, std::ios::beg);
 
 
 
-
+    FB_RETCODE RETURN_CODE = (m_LoadedFileName == filepath ? FB_RETCODE::OFFSET_CHANGE_LOAD : FB_RETCODE::FILE_CHANGE_LOAD);
     unsigned long loadSize = (static_cast<size_t>(fileSize) - offset) > m_MaxLoadSize ? m_MaxLoadSize : (static_cast<size_t>(fileSize) - offset);
     m_CurrentBounds[0] = offset;
     m_CurrentBounds[1] =  offset + loadSize; // this will store the offsets to the portion of the file currently loaded
@@ -126,7 +126,7 @@ unsigned char* FileBrowser::LoadFile(const std::string& filepath, const size_t& 
     auto tmp = std::vector<unsigned char>(buffer.Get(), buffer.Get() + loadSize);
     m_FileLoadData = tmp;
     file.close();
-    return (unsigned char*)0x1;
+    return RETURN_CODE;
 }
 
 void FileBrowser::SetInputPath(const std::string& new_inputpath)

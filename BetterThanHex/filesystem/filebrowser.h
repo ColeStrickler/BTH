@@ -10,6 +10,15 @@
 
 namespace fs = std::filesystem;
 
+enum class FB_RETCODE : short
+{
+	NO_CHANGE_LOAD,
+	OFFSET_CHANGE_LOAD,
+	FILE_CHANGE_LOAD,
+	FILE_ERROR_LOAD
+};
+
+
 
 class FileBrowser
 {
@@ -22,7 +31,7 @@ public:
 	std::vector<std::string> PathToStringVec(const std::vector<fs::path>& pvec) const;
 	std::vector<std::string> CurrentDirectoryToStringVec();
 	std::vector<fs::directory_entry> DisplayFilter();
-	unsigned char* LoadFile(const std::string& filepath, const size_t& offset = 0);
+	FB_RETCODE LoadFile(const std::string& filepath, const size_t& offset = 0);
 	void SetInputPath(const std::string& new_inputpath);
 
 	void DisplayCurrentDirectory();

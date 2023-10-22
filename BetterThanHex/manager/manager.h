@@ -8,11 +8,26 @@
 #include "../decoder/byte_decoder.h"
 #include "../scanner/scanner.h"
 #include <chrono>
+#include "..\pe\pe.h"
 
 static ImVec4 RedFont = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
 static ImVec4 GreenFont = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
 static ImVec4 BlueFont = ImVec4(0.0f, 1.0f, 1.0f, 1.0f);
 static ImVec4 YellowFont = ImVec4(1.0f, 1.0f, 0.2f, 1.0f);
+
+
+enum class PEINFO : short
+{
+	DOS_HEADER,
+	RICH_HEADER,
+	FILE_HEADER,
+	NT_HEADER,
+	DATA_DIRECTORIES,
+	SECTION_HEADERS,
+	IMPORTS,
+	EXPORTS,
+};
+
 
 
 class Manager
@@ -53,10 +68,22 @@ public:
 
 
 
+	// PE Disector Functions
+	void HandlePeDump();
+	void HandlePeFileFormatButtons();
+	void HandlePeDisplay();
+	void HandleDosHeader();
+
+	void HandleNtHeader();
+
+	void HandleImports();
+
+
 
 	FileBrowser* m_FileBrowser;
 	Decoder* m_Decoder;
 	Scanner* m_ByteScanner;
+	PEDisector* m_PEDisector;
 private:
 	/*
 		GLOBAL STATE
@@ -106,6 +133,12 @@ private:
 	float m_ByteScannerProgress;
 	std::vector<unsigned char> m_ByteScannerPattern;
 	std::vector<unsigned int> m_ByteScannerMatches;
+
+
+	/*
+		PE PARSER
+	*/
+	PEINFO m_PEselected;
 
 	
 

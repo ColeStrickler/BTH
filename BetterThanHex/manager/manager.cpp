@@ -7,19 +7,34 @@ static std::string ucharToHexString(unsigned char value) {
 }
 
 
+static std::string ucharVecToHexString(std::vector<unsigned char>& vec)
+{
+	std::string ret;
+	for (auto& c : vec)
+	{
+		ret += ucharToHexString(c) + " ";
+	}
+	return ret;
+}
+
+
 
 /*
 	The Manager class is a state machine that handles most of the interactivity of the UI as well as orchestracts
 	classes under the hood that provide the heavy lifting
 */
 Manager::Manager() : m_HexDumpWidth(475), m_HexDumpHeight(400), m_DecoderWidth(475), m_DecoderHeight(400), m_DecoderNumInstructionsDisplayed(200),
-					m_MaximumLoadSize(20000)
+					m_MaximumLoadSize(200000)
 {
 	m_FileBrowser = new FileBrowser(m_MaximumLoadSize);
 	m_Decoder = new Decoder();
 	m_ByteScanner = new Scanner();
 }
 
+
+/*
+	Main Loop
+*/
 
 void Manager::RenderUI()
 {
@@ -44,12 +59,23 @@ void Manager::RenderUI()
 		COLUMN 2
 	*/
 	HandleDecoder();
+	ImGui::Columns(1);
+	HandlePeDump();
 	
 	
 
 
 
 }
+
+
+
+
+
+/*
+	File Naviator
+*/
+
 void Manager::HandleFileNavigatorButtons()
 {
 	if (ImGui::Button("Select File"))
@@ -100,8 +126,15 @@ void Manager::DisplayFileNavigator()
 			else
 			{
 				m_FileBrowser->SetInputPath(c_str);
-				m_FileBrowser->LoadFile(str);
+				auto fb_retcode = m_FileBrowser->LoadFile(str);
 				m_Decoder->DecodeBytes(m_FileBrowser->m_FileLoadData);
+
+				if (fb_retcode == FB_RETCODE::FILE_CHANGE_LOAD)
+				{
+					if (m_PEDisector != nullptr)
+						delete m_PEDisector;
+					m_PEDisector = new PEDisector(m_FileBrowser->m_LoadedFileName);
+				}			
 			}
 		}
 	}
@@ -112,6 +145,13 @@ void Manager::HandleFileNavigator()
 	HandleFileNavigatorButtons();
 	HandleFileNavigatorPopups();
 }
+
+
+/*
+	Hex Dump
+*/
+
+
 int Manager::DrawHexValuesWindow()
 {
 	ImGui::BeginChild("ScrollingRegion", ImVec2(m_HexDumpWidth, m_HexDumpHeight), true);
@@ -224,7 +264,7 @@ void Manager::HandleHexdumpButtons()
 	{
 		m_GlobalOffset = new_offset;
 		auto parse_inst = m_FileBrowser->LoadFile(m_FileBrowser->m_LoadedFileName, m_GlobalOffset);
-		if (parse_inst == (unsigned char*)0x1)
+		if (parse_inst == FB_RETCODE::FILE_CHANGE_LOAD || parse_inst == FB_RETCODE::OFFSET_CHANGE_LOAD)
 		{
 			
 			m_Decoder->DecodeBytes(m_FileBrowser->m_FileLoadData);
@@ -263,6 +303,11 @@ void Manager::HandleHexdump()
 	HandleHexdumpPopups();
 	HandleHexdumpButtons();
 }
+
+
+/*
+	Decoder 
+*/
 
 void Manager::HandleDecoderButtons()
 {
@@ -309,6 +354,13 @@ ImVec4 Manager::GetFont(DecodedInst& inst)
 	}
 	return GreenFont;
 }
+
+
+
+
+/*
+	Byte Scanner
+*/
 
 void Manager::HandleByteScanner()
 {
@@ -408,8 +460,6 @@ void Manager::HandleByteScannerPopup()
 		}
 
 
-
-
 		if (m_bByteScannerShowPatternEditPopup)
 		{
 			ImGui::OpenPopup("Edit Byte");
@@ -439,13 +489,118 @@ void Manager::HandleByteScannerPopup()
 			ImGui::EndPopup();
 		}
 
-	
 		ImGui::EndPopup();
 	}
-
 
 }
 
 
 
+/*
+	PE Dump
+*/
+
+void Manager::HandlePeDump()
+{
+	HandlePeFileFormatButtons();
+	if (!m_PEDisector)
+		return;
+	if (!m_PEDisector->ValidPE())
+		return;
+	if (!m_PEDisector->DisectionSuccessful())
+		return;
+	HandlePeDisplay();
+}
+
+void Manager::HandlePeFileFormatButtons()
+{
+	if (ImGui::Button("DOS Header"))
+		m_PEselected = PEINFO::DOS_HEADER;
+	ImGui::SameLine();
+	if (ImGui::Button("Rich Header"))
+		m_PEselected = PEINFO::RICH_HEADER;
+	ImGui::SameLine();
+	if (ImGui::Button("File Header"))
+		m_PEselected = PEINFO::FILE_HEADER;
+	ImGui::SameLine();
+	if (ImGui::Button("NT Header"))
+		m_PEselected = PEINFO::NT_HEADER;
+	ImGui::SameLine();
+	if (ImGui::Button("Data Directories"))
+		m_PEselected = PEINFO::DATA_DIRECTORIES;
+	ImGui::SameLine();
+	if (ImGui::Button("Section Headers"))
+		m_PEselected = PEINFO::SECTION_HEADERS;
+	ImGui::SameLine();
+	if (ImGui::Button("Imports"))
+		m_PEselected = PEINFO::IMPORTS;
+	ImGui::SameLine();
+	if (ImGui::Button("Exports"))
+		m_PEselected = PEINFO::EXPORTS;
+}
+
+void Manager::HandlePeDisplay()
+{
+	switch (m_PEselected)
+	{
+		case PEINFO::DOS_HEADER:
+			HandleDosHeader();
+		case PEINFO::RICH_HEADER:
+			return;
+		case PEINFO::FILE_HEADER:	
+			return;
+		case PEINFO::NT_HEADER:
+			HandleNtHeader();
+		case PEINFO::DATA_DIRECTORIES:
+			return;
+		case PEINFO::SECTION_HEADERS:
+			return;
+		case PEINFO::IMPORTS:
+			HandleImports();
+		case PEINFO::EXPORTS:
+			return;
+		default:
+			return;
+	}
+}
+
+void Manager::HandleDosHeader()
+{
+	for (auto& e : m_PEDisector->m_ParsedDosHeader)
+	{
+		ImGui::Text(e.m_Name.c_str());
+		ImGui::SameLine();
+		ImGui::Text(ucharVecToHexString(e.m_Bytes).c_str());
+	}
+}
+
+void Manager::HandleNtHeader()
+{
+	for (auto& e : m_PEDisector->m_ParsedOptionalHeader)
+	{
+		ImGui::Text(e.m_Name.c_str());
+		ImGui::SameLine();
+		ImGui::Text(ucharVecToHexString(e.m_Bytes).c_str());
+	}
+}
+
+void Manager::HandleImports()
+{
+	ImGui::Columns(2);
+	for (auto& e : m_PEDisector->m_ParsedImports)
+	{
+		if (ImGui::Selectable(e.m_Library.c_str()))
+		{
+			ImGui::NextColumn();
+			for (auto& i : e.m_FunctionImports)
+			{
+				ImGui::Text(i.m_FunctionName.c_str());
+				//ImGui::Spacing();
+				//ImGui::SameLine();
+				// Will need to add descriptor data here i.m_DescriptorData
+			}
+			ImGui::NextColumn();
+		}
+	}
+}
 
