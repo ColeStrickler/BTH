@@ -2,6 +2,7 @@
 #include "../Dependencies/imgui/imgui.h"
 #include "../Dependencies/imgui/imgui_impl_glfw.h"
 #include "../Dependencies/imgui/imgui_impl_opengl3.h"
+#include <thread>
 #include <vector>
 #include "../filesystem/filebrowser.h"
 #include "../utils/utils.h"
@@ -9,6 +10,8 @@
 #include "../scanner/scanner.h"
 #include <chrono>
 #include "..\pe\pe.h"
+#include <mutex>
+
 
 static ImVec4 RedFont = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
 static ImVec4 GreenFont = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
@@ -36,8 +39,11 @@ public:
 	Manager();
 	~Manager();
 
-
+	// Manager Functions
 	void RenderUI();
+	void BeginThreadManagerThread();
+
+
 
 
 	// File Browser Functions
@@ -80,7 +86,9 @@ public:
 	void HandleSectionHeaders();
 
 	void HandleImports();
+	
 
+	
 
 
 	FileBrowser* m_FileBrowser;
@@ -95,7 +103,12 @@ private:
 	char m_OffsetEditorBuffer[9];
 	int m_MaximumLoadSize;	// the maximum amount of a file we can load at a time
 
-
+	// These are all mutex protected V
+	std::thread m_ThreadManagerThread;
+	std::mutex m_ThreadManagerMutex;
+	std::vector<std::unique_ptr<std::thread>> m_ActiveThreads;
+	// These are all mutex protected ^
+	bool m_bThreadManagerExit;
 
 
 	/*

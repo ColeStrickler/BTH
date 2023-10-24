@@ -150,6 +150,8 @@ PEDisector::PEDisector(const std::string& loadFile)
 
 	auto base = filebuf.Get();
 	auto dos = (PIMAGE_DOS_HEADER)filebuf.Get();
+	if (dos->e_magic != 0x5A4D)
+		return;
 	auto nt = (PIMAGE_NT_HEADERS)(base + dos->e_lfanew);
 	auto fh = &nt->FileHeader;
 	m_bValidPEFile = EqualBytes((unsigned char*)& nt->Signature, (unsigned char*)"PE\0\0", sizeof(nt->Signature));
@@ -305,8 +307,6 @@ void PEDisector::ParseDataDirectories(PIMAGE_DATA_DIRECTORY dd, DWORD num_dd)
 		m_ParsedDataDirectory_Opt.push_back(entry);
 	}
 }
-
-
 
 
 

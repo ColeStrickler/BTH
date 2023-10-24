@@ -29,6 +29,14 @@ Manager::Manager() : m_HexDumpWidth(475), m_HexDumpHeight(400), m_DecoderWidth(4
 	m_FileBrowser = new FileBrowser(m_MaximumLoadSize);
 	m_Decoder = new Decoder();
 	m_ByteScanner = new Scanner();
+	auto t = std::thread(&Manager::BeginThreadManagerThread, this);
+	m_ThreadManagerThread = std::move(t);
+}
+
+Manager::~Manager()
+{
+	m_bThreadManagerExit = true;
+	m_ThreadManagerThread.join();
 }
 
 
@@ -68,6 +76,23 @@ void Manager::RenderUI()
 
 }
 
+
+void Manager::BeginThreadManagerThread()
+{
+	while (!m_bThreadManagerExit)
+	{
+		if (m_ActiveThreads.size())
+		{
+			std::lock_guard<std::mutex> lock(m_ThreadManagerMutex);
+			for (int i = m_ActiveThreads.size() - 1; i >= 0; i--)
+			{
+				auto& t = m_ActiveThreads[i];
+				t->join();
+			}
+			m_ActiveThreads.clear();
+		}
+	}
+}
 
 
 
@@ -379,11 +404,20 @@ void Manager::HandleByteScannerPopupButton()
 		{
 			m_ByteScannerPattern.push_back(m_ByteScannerPatternBuffer[i]);
 		}
-		m_ByteScannerBytesScanned = m_FileBrowser->m_FileLoadData.size();
+		m_ByteScannerBytesScanned = m_FileBrowser->m_LoadedFileSize;
 
 
 		auto start_time = std::chrono::high_resolution_clock::now();
-		m_ByteScanner->scan_bytes(m_ByteScannerPattern, m_FileBrowser->m_FileLoadData, &m_ByteScannerProgress);
+		//m_ByteScanner->scan_file(m_FileBrowser, m_ByteScannerPattern, m_ByteScannerProgress);
+		std::thread scan_thread(&Scanner::scan_file, m_ByteScanner, m_FileBrowser, std::ref(m_ByteScannerPattern), std::ref(m_ByteScannerProgress));
+		{
+			std::lock_guard<std::mutex> lock(m_ThreadManagerMutex);
+			m_ActiveThreads.push_back(std::make_unique<std::thread>(std::move(scan_thread)));
+		}
+
+
+		
+		//m_ByteScanner->scan_bytes(m_ByteScannerPattern, m_FileBrowser->m_FileLoadData, &m_ByteScannerProgress);
 		//std::thread(&Scanner::scan_bytes, this->m_ByteScanner, m_ByteScannerPattern, m_FileBrowser->m_FileLoadData, &m_ByteScannerProgress);
 		auto end_time = std::chrono::high_resolution_clock::now();
 		m_ByteScannerTimeTaken = end_time - start_time;
@@ -614,6 +648,8 @@ void Manager::HandleRichHeader()
 {
 	auto richHeader = m_PEDisector->m_ParsedRichHeader;
 	auto rhEntries = richHeader.m_Entries;
+	if (!rhEntries.size())
+		return;
 	auto ex_Entry = richHeader.m_Entries[0];
 	
 	auto num_Rows = rhEntries.size();

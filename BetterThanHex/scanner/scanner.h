@@ -3,6 +3,7 @@
 #include <unordered_set>
 #include <map>
 #include <math.h>
+#include "../filesystem/filebrowser.h"
 
 
 #include "../Dependencies/imgui/imgui.h"
@@ -26,8 +27,11 @@ public:
 	/*
 		scan_bytes is a boyer-moore implementation
 	*/
-	std::vector<long long int> scan_bytes(const std::vector<unsigned char>& pattern, const std::vector<unsigned char>& bytes, float* progress) ;
-	std::vector<long long int> m_ByteMatches;
+	std::vector<unsigned long long> scan_bytes(const std::vector<unsigned char>& pattern, const std::vector<unsigned char>& bytes, float* progress);
+	std::vector<unsigned long long> scan_bytes(const std::vector<unsigned char>& pattern, const std::vector<unsigned char>& bytes, std::vector<unsigned long long>& out, size_t offset);
+	std::vector<unsigned long long> scan_file(FileBrowser* fb, const std::vector<unsigned char>& pattern,  float& progress);
+
+	std::vector<unsigned long long> m_ByteMatches;
 private:
 	
 };

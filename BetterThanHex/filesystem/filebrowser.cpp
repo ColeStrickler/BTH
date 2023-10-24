@@ -129,6 +129,23 @@ FB_RETCODE FileBrowser::LoadFile(const std::string& filepath, const size_t& offs
     return RETURN_CODE;
 }
 
+std::vector<unsigned char> FileBrowser::LoadBytes(unsigned long long offset, DWORD numToRead, DWORD* numRead)
+{
+    auto& filename = m_LoadedFileName;
+    utils::NewBuffer buffer(numToRead);
+    std::ifstream file(filename, std::ios::binary);
+    numToRead = (m_LoadedFileSize - offset > numToRead ? numToRead : m_LoadedFileSize - offset);
+    if (!file.is_open())
+        return {};
+    file.seekg(offset, std::ios::beg);
+    file.read(reinterpret_cast<char*>(buffer.Get()), numToRead);
+    auto read = file.gcount();
+    *numRead = read;
+    auto ret = std::vector<unsigned char>(buffer.Get(), buffer.Get() + read);
+    file.close();
+    return ret;
+}
+
 void FileBrowser::SetInputPath(const std::string& new_inputpath)
 {
     memset(m_InputPath, 0x00, _MAX_PATH);

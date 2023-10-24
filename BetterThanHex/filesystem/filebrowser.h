@@ -32,6 +32,7 @@ public:
 	std::vector<std::string> CurrentDirectoryToStringVec();
 	std::vector<fs::directory_entry> DisplayFilter();
 	FB_RETCODE LoadFile(const std::string& filepath, const size_t& offset = 0);
+	std::vector<unsigned char> LoadBytes(unsigned long long offset, DWORD numToRead, DWORD* numRead);
 	void SetInputPath(const std::string& new_inputpath);
 
 	void DisplayCurrentDirectory();
