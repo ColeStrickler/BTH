@@ -10,7 +10,7 @@
 # To DO
 - Fix Progress Bar for Byte scanner
 - add support for dynamic offsets into scanner
-- finish up PE parser and integrate into GUI
+- Add resource and export parser to PE viewer, besides this basics of PE parser are done
 
 
 ## Its coming along - need to start making it prettier
