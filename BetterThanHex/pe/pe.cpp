@@ -7,10 +7,11 @@
 
 
 
-static void fhInsertEntry(unsigned char* bytes, int size, const std::string& name, std::vector<fh_Entry>& target)
+static void fhInsertEntry(unsigned char* bytes, int size, const std::string& name, std::vector<fh_Entry>& target, DWORD offset = 0)
 {
 	fh_Entry entry;
 	entry.m_Name = name;
+	entry.m_Offset = offset;
 	for (int i = 0; i < size; i++)
 	{
 		entry.m_Bytes.push_back(bytes[i]);
@@ -67,6 +68,14 @@ static void PrintRichHeader(fh_RichHeader& m_ParsedRichHeader)
 	}
 }
 
+
+std::string RichHeaderMeaning(RichHeaderEntry& entry)
+{
+	char tmp_buf[256];
+	sprintf_s(tmp_buf, "%d.%d.%d", entry.m_buildID, entry.m_prodID, entry.m_useCount);
+	auto ret = std::string(tmp_buf);
+	return ret;
+}
 
 
 
@@ -148,7 +157,7 @@ PEDisector::PEDisector(const std::string& loadFile)
 	{
 		ParseDosHeader(dos);
 		ParseRichHeader(dos);
-		ParseFileHeader(fh);
+		ParseFileHeader(fh, dos);
 		ParseOptionalHeader(dos);
 		ParseSectionHeaders(dos);
 		ParseImports(dos, file);
@@ -165,101 +174,101 @@ PEDisector::PEDisector(const std::string& loadFile)
 
 void PEDisector::ParseDosHeader(PIMAGE_DOS_HEADER dos)
 {
-	fhInsertEntry((unsigned char*)&dos->e_magic,		sizeof(dos->e_magic),			"e_magic", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_cblp,		sizeof(dos->e_cblp),			"e_cblp", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_cp,		sizeof(dos->e_cp),				"e_cp", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_crlc,		sizeof(dos->e_crlc),			"e_rlc", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_cparhdr,	sizeof(dos->e_cparhdr),			"e_cparhdr", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_minalloc,	sizeof(dos->e_minalloc),		"e_minalloc", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_maxalloc,	sizeof(dos->e_maxalloc),		"e_maxalloc", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_ss,		sizeof(dos->e_ss),				"e_ss", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_sp,		sizeof(dos->e_sp),				"e_sp", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_csum,		sizeof(dos->e_csum),			"e_csum", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_ip,		sizeof(dos->e_ip),				"e_ip", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_cs,		sizeof(dos->e_cs),				"e_cs", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_lfarlc,	sizeof(dos->e_lfarlc),			"e_lfarlc", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_ovno,		sizeof(dos->e_ovno),			"e_ovno", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_res,		sizeof(dos->e_res),				"e_res", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_oemid,		sizeof(dos->e_oemid),			"e_oemid", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_oeminfo,	sizeof(dos->e_oeminfo),			"e_oeminfo", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_res2,		sizeof(dos->e_res2),			"e_res2", m_ParsedDosHeader);
-	fhInsertEntry((unsigned char*)&dos->e_lfanew,	sizeof(dos->e_lfanew),			"e_lfanew", m_ParsedDosHeader);
+	fhInsertEntry((unsigned char*)&dos->e_magic,		sizeof(dos->e_magic),			"e_magic", m_ParsedDosHeader,		offsetof(IMAGE_DOS_HEADER,e_magic));
+	fhInsertEntry((unsigned char*)&dos->e_cblp,		sizeof(dos->e_cblp),				"e_cblp", m_ParsedDosHeader,		offsetof(IMAGE_DOS_HEADER,e_cblp));
+	fhInsertEntry((unsigned char*)&dos->e_cp,		sizeof(dos->e_cp),					"e_cp", m_ParsedDosHeader,			offsetof(IMAGE_DOS_HEADER,e_cp));
+	fhInsertEntry((unsigned char*)&dos->e_crlc,		sizeof(dos->e_crlc),				"e_rlc", m_ParsedDosHeader,			offsetof(IMAGE_DOS_HEADER,e_crlc));
+	fhInsertEntry((unsigned char*)&dos->e_cparhdr,	sizeof(dos->e_cparhdr),				"e_cparhdr", m_ParsedDosHeader,		offsetof(IMAGE_DOS_HEADER,e_cparhdr));
+	fhInsertEntry((unsigned char*)&dos->e_minalloc,	sizeof(dos->e_minalloc),			"e_minalloc", m_ParsedDosHeader,	offsetof(IMAGE_DOS_HEADER,e_minalloc));
+	fhInsertEntry((unsigned char*)&dos->e_maxalloc,	sizeof(dos->e_maxalloc),			"e_maxalloc", m_ParsedDosHeader,	offsetof(IMAGE_DOS_HEADER,e_maxalloc));
+	fhInsertEntry((unsigned char*)&dos->e_ss,		sizeof(dos->e_ss),					"e_ss", m_ParsedDosHeader,			offsetof(IMAGE_DOS_HEADER,e_ss));
+	fhInsertEntry((unsigned char*)&dos->e_sp,		sizeof(dos->e_sp),					"e_sp", m_ParsedDosHeader,			offsetof(IMAGE_DOS_HEADER,e_sp));
+	fhInsertEntry((unsigned char*)&dos->e_csum,		sizeof(dos->e_csum),				"e_csum", m_ParsedDosHeader,		offsetof(IMAGE_DOS_HEADER,e_csum));
+	fhInsertEntry((unsigned char*)&dos->e_ip,		sizeof(dos->e_ip),					"e_ip", m_ParsedDosHeader,			offsetof(IMAGE_DOS_HEADER,e_ip));
+	fhInsertEntry((unsigned char*)&dos->e_cs,		sizeof(dos->e_cs),					"e_cs", m_ParsedDosHeader,			offsetof(IMAGE_DOS_HEADER,e_cs));
+	fhInsertEntry((unsigned char*)&dos->e_lfarlc,	sizeof(dos->e_lfarlc),				"e_lfarlc", m_ParsedDosHeader,		offsetof(IMAGE_DOS_HEADER,e_lfarlc));
+	fhInsertEntry((unsigned char*)&dos->e_ovno,		sizeof(dos->e_ovno),				"e_ovno", m_ParsedDosHeader,		offsetof(IMAGE_DOS_HEADER,e_ovno ));
+	fhInsertEntry((unsigned char*)&dos->e_res,		sizeof(dos->e_res),					"e_res", m_ParsedDosHeader,			offsetof(IMAGE_DOS_HEADER,e_res ));
+	fhInsertEntry((unsigned char*)&dos->e_oemid,		sizeof(dos->e_oemid),			"e_oemid", m_ParsedDosHeader,		offsetof(IMAGE_DOS_HEADER,e_oemid));
+	fhInsertEntry((unsigned char*)&dos->e_oeminfo,	sizeof(dos->e_oeminfo),				"e_oeminfo", m_ParsedDosHeader,		offsetof(IMAGE_DOS_HEADER,e_oeminfo));
+	fhInsertEntry((unsigned char*)&dos->e_res2,		sizeof(dos->e_res2),				"e_res2", m_ParsedDosHeader,		offsetof(IMAGE_DOS_HEADER,e_res2));
+	fhInsertEntry((unsigned char*)&dos->e_lfanew,	sizeof(dos->e_lfanew),				"e_lfanew", m_ParsedDosHeader,		offsetof(IMAGE_DOS_HEADER,e_lfanew));
 }
 
-void PEDisector::ParseFileHeader(PIMAGE_FILE_HEADER fh)
+void PEDisector::ParseFileHeader(PIMAGE_FILE_HEADER fh, PIMAGE_DOS_HEADER dos)
 {
-	fhInsertEntry((unsigned char*)&fh->Machine,				sizeof(fh->Machine),					"Machine", m_ParsedFileHeader);
-	fhInsertEntry((unsigned char*)&fh->NumberOfSections,		sizeof(fh->NumberOfSections),			"NumberOfSections", m_ParsedFileHeader);
-	fhInsertEntry((unsigned char*)&fh->TimeDateStamp,		sizeof(fh->TimeDateStamp),				"TimeDateStamp", m_ParsedFileHeader);
-	fhInsertEntry((unsigned char*)&fh->PointerToSymbolTable, sizeof(fh->PointerToSymbolTable),		"PointerToSymbolTable", m_ParsedFileHeader);
-	fhInsertEntry((unsigned char*)&fh->NumberOfSymbols,		sizeof(fh->NumberOfSymbols),			"NumberOfSymbols", m_ParsedFileHeader);
-	fhInsertEntry((unsigned char*)&fh->SizeOfOptionalHeader, sizeof(fh->SizeOfOptionalHeader),		"SizeOfOptionalHeader", m_ParsedFileHeader);
-	fhInsertEntry((unsigned char*)&fh->Characteristics,		sizeof(fh->Characteristics),			"Characteristics", m_ParsedFileHeader);
+	fhInsertEntry((unsigned char*)&fh->Machine,				sizeof(fh->Machine),					"Machine", m_ParsedFileHeader,			dos->e_lfanew + sizeof(DWORD) + offsetof(IMAGE_FILE_HEADER, Machine));
+	fhInsertEntry((unsigned char*)&fh->NumberOfSections, sizeof(fh->NumberOfSections), "NumberOfSections", m_ParsedFileHeader,				dos->e_lfanew + sizeof(DWORD) + offsetof(IMAGE_FILE_HEADER, NumberOfSections));
+	fhInsertEntry((unsigned char*)&fh->TimeDateStamp, sizeof(fh->TimeDateStamp), "TimeDateStamp", m_ParsedFileHeader,						dos->e_lfanew + sizeof(DWORD) + offsetof(IMAGE_FILE_HEADER, TimeDateStamp));
+	fhInsertEntry((unsigned char*)&fh->PointerToSymbolTable, sizeof(fh->PointerToSymbolTable), "PointerToSymbolTable", m_ParsedFileHeader,	dos->e_lfanew + sizeof(DWORD) + offsetof(IMAGE_FILE_HEADER, PointerToSymbolTable));
+	fhInsertEntry((unsigned char*)&fh->NumberOfSymbols, sizeof(fh->NumberOfSymbols), "NumberOfSymbols", m_ParsedFileHeader,					dos->e_lfanew + sizeof(DWORD) + offsetof(IMAGE_FILE_HEADER, NumberOfSymbols));
+	fhInsertEntry((unsigned char*)&fh->SizeOfOptionalHeader, sizeof(fh->SizeOfOptionalHeader), "SizeOfOptionalHeader", m_ParsedFileHeader,	dos->e_lfanew + sizeof(DWORD) + offsetof(IMAGE_FILE_HEADER, SizeOfOptionalHeader));
+	fhInsertEntry((unsigned char*)&fh->Characteristics, sizeof(fh->Characteristics), "Characteristics", m_ParsedFileHeader,					dos->e_lfanew + sizeof(DWORD) + offsetof(IMAGE_FILE_HEADER, Characteristics));
 }
 
-void PEDisector::ParseOptionalHeader32(PIMAGE_OPTIONAL_HEADER32 opt)
+void PEDisector::ParseOptionalHeader32(PIMAGE_OPTIONAL_HEADER32 opt, PIMAGE_DOS_HEADER dos)
 {
-	fhInsertEntry((unsigned char*)&opt->Magic,						sizeof(opt->Magic),							"Magic", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->MajorLinkerVersion,			sizeof(opt->MajorLinkerVersion),			"MajorLinkerVersion", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->MinorLinkerVersion,			sizeof(opt->MinorLinkerVersion),			"MinorLinkerVersion", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfCode,					sizeof(opt->SizeOfCode),					"SizeOfCode", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfInitializedData,		sizeof(opt->SizeOfInitializedData),			"SizeOfInitializedData", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfUninitializedData,		sizeof(opt->SizeOfUninitializedData),		"SizeOfUninitializedData", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->AddressOfEntryPoint,			sizeof(opt->AddressOfEntryPoint),			"AddressOfEntryPoint", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->BaseOfCode,					sizeof(opt->BaseOfCode),					"BaseOfCode", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->BaseOfData,					sizeof(opt->BaseOfData),					"BaseOfData", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->ImageBase,					sizeof(opt->ImageBase),						"ImageBase", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SectionAlignment,			sizeof(opt->SectionAlignment),				"SectionAlignment", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->FileAlignment,				sizeof(opt->FileAlignment),					"FileAlignment", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->MajorOperatingSystemVersion, sizeof(opt->MajorOperatingSystemVersion),	"MajorOperatingSystemVersion", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->MinorOperatingSystemVersion, sizeof(opt->MinorOperatingSystemVersion),	"MinorOperatingSystemVersion", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->MajorSubsystemVersion,		sizeof(opt->MajorSubsystemVersion),			"MajorSubsystemVersion", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->MinorSubsystemVersion,		sizeof(opt->MinorSubsystemVersion),			"MinorSubsystemVersion", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->Win32VersionValue,			sizeof(opt->Win32VersionValue),				"Win32VersionValue", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfImage,					sizeof(opt->SizeOfImage),					"SizeOfImage", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfHeaders,				sizeof(opt->SizeOfHeaders),					"SizeOfHeaders", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->CheckSum,					sizeof(opt->CheckSum),						"CheckSum", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->Subsystem,					sizeof(opt->Subsystem),						"Subsystem", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->DllCharacteristics,			sizeof(opt->DllCharacteristics),			"DllCharacteristics", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfStackReserve,			sizeof(opt->SizeOfStackReserve),			"SizeOfStackReserve", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfStackCommit,			sizeof(opt->SizeOfStackCommit),				"SizeOfStackCommit", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfHeapReserve,			sizeof(opt->SizeOfHeapReserve),				"SizeOfHeapReserve", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfHeapCommit,			sizeof(opt->SizeOfHeapCommit),				"SizeOfHeapCommit", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->LoaderFlags,					sizeof(opt->LoaderFlags),					"LoaderFlags", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->NumberOfRvaAndSizes,			sizeof(opt->NumberOfRvaAndSizes),			"NumberOfRvaAndSizes", m_ParsedOptionalHeader);
+	fhInsertEntry((unsigned char*)&opt->Magic,						sizeof(opt->Magic),							"Magic", m_ParsedOptionalHeader,						dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, Magic));
+	fhInsertEntry((unsigned char*)&opt->MajorLinkerVersion,			sizeof(opt->MajorLinkerVersion),			"MajorLinkerVersion", m_ParsedOptionalHeader,			dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, MajorLinkerVersion));
+	fhInsertEntry((unsigned char*)&opt->MinorLinkerVersion,			sizeof(opt->MinorLinkerVersion),			"MinorLinkerVersion", m_ParsedOptionalHeader,			dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, MinorLinkerVersion));
+	fhInsertEntry((unsigned char*)&opt->SizeOfCode,					sizeof(opt->SizeOfCode),					"SizeOfCode", m_ParsedOptionalHeader,					dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, SizeOfCode));
+	fhInsertEntry((unsigned char*)&opt->SizeOfInitializedData,		sizeof(opt->SizeOfInitializedData),			"SizeOfInitializedData", m_ParsedOptionalHeader	,		dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, SizeOfInitializedData));
+	fhInsertEntry((unsigned char*)&opt->SizeOfUninitializedData,	sizeof(opt->SizeOfUninitializedData),			"SizeOfUninitializedData", m_ParsedOptionalHeader,	dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, SizeOfUninitializedData));
+	fhInsertEntry((unsigned char*)&opt->AddressOfEntryPoint,		sizeof(opt->AddressOfEntryPoint),				"AddressOfEntryPoint", m_ParsedOptionalHeader,		dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, AddressOfEntryPoint));
+	fhInsertEntry((unsigned char*)&opt->BaseOfCode,					sizeof(opt->BaseOfCode),					"BaseOfCode", m_ParsedOptionalHeader,					dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, BaseOfCode));
+	fhInsertEntry((unsigned char*)&opt->BaseOfData,					sizeof(opt->BaseOfData),					"BaseOfData", m_ParsedOptionalHeader,					dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, BaseOfData));
+	fhInsertEntry((unsigned char*)&opt->ImageBase,					sizeof(opt->ImageBase),						"ImageBase", m_ParsedOptionalHeader	,					dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, ImageBase));
+	fhInsertEntry((unsigned char*)&opt->SectionAlignment,			sizeof(opt->SectionAlignment),				"SectionAlignment", m_ParsedOptionalHeader,				dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, SectionAlignment));
+	fhInsertEntry((unsigned char*)&opt->FileAlignment,				sizeof(opt->FileAlignment),					"FileAlignment", m_ParsedOptionalHeader,				dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, FileAlignment));
+	fhInsertEntry((unsigned char*)&opt->MajorOperatingSystemVersion,sizeof(opt->MajorOperatingSystemVersion),	"MajorOperatingSystemVersion", m_ParsedOptionalHeader,	dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, MajorOperatingSystemVersion));
+	fhInsertEntry((unsigned char*)&opt->MinorOperatingSystemVersion,sizeof(opt->MinorOperatingSystemVersion),	"MinorOperatingSystemVersion", m_ParsedOptionalHeader,	dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, MinorOperatingSystemVersion));
+	fhInsertEntry((unsigned char*)&opt->MajorSubsystemVersion,		sizeof(opt->MajorSubsystemVersion),			"MajorSubsystemVersion", m_ParsedOptionalHeader	,		dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, MajorSubsystemVersion));
+	fhInsertEntry((unsigned char*)&opt->MinorSubsystemVersion,		sizeof(opt->MinorSubsystemVersion),			"MinorSubsystemVersion", m_ParsedOptionalHeader,		dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, MinorSubsystemVersion));
+	fhInsertEntry((unsigned char*)&opt->Win32VersionValue,			sizeof(opt->Win32VersionValue),				"Win32VersionValue", m_ParsedOptionalHeader,			dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, Win32VersionValue));
+	fhInsertEntry((unsigned char*)&opt->SizeOfImage,				sizeof(opt->SizeOfImage),						"SizeOfImage", m_ParsedOptionalHeader,				dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, SizeOfImage));
+	fhInsertEntry((unsigned char*)&opt->SizeOfHeaders,				sizeof(opt->SizeOfHeaders),					"SizeOfHeaders", m_ParsedOptionalHeader,				dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, SizeOfHeaders));
+	fhInsertEntry((unsigned char*)&opt->CheckSum,					sizeof(opt->CheckSum),						"CheckSum", m_ParsedOptionalHeader,						dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, CheckSum));
+	fhInsertEntry((unsigned char*)&opt->Subsystem,					sizeof(opt->Subsystem),						"Subsystem", m_ParsedOptionalHeader,					dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, Subsystem));
+	fhInsertEntry((unsigned char*)&opt->DllCharacteristics,			sizeof(opt->DllCharacteristics),			"DllCharacteristics", m_ParsedOptionalHeader,			dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, DllCharacteristics));
+	fhInsertEntry((unsigned char*)&opt->SizeOfStackReserve,			sizeof(opt->SizeOfStackReserve),			"SizeOfStackReserve", m_ParsedOptionalHeader,			dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, SizeOfStackReserve));
+	fhInsertEntry((unsigned char*)&opt->SizeOfStackCommit,			sizeof(opt->SizeOfStackCommit),				"SizeOfStackCommit", m_ParsedOptionalHeader	,			dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, SizeOfStackCommit));
+	fhInsertEntry((unsigned char*)&opt->SizeOfHeapReserve,			sizeof(opt->SizeOfHeapReserve),				"SizeOfHeapReserve", m_ParsedOptionalHeader,			dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, SizeOfHeapReserve));
+	fhInsertEntry((unsigned char*)&opt->SizeOfHeapCommit,			sizeof(opt->SizeOfHeapCommit),				"SizeOfHeapCommit", m_ParsedOptionalHeader,				dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, SizeOfHeapCommit));
+	fhInsertEntry((unsigned char*)&opt->LoaderFlags,				sizeof(opt->LoaderFlags),						"LoaderFlags", m_ParsedOptionalHeader,				dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, LoaderFlags));
+	fhInsertEntry((unsigned char*)&opt->NumberOfRvaAndSizes,		sizeof(opt->NumberOfRvaAndSizes),				"NumberOfRvaAndSizes", m_ParsedOptionalHeader,		dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, NumberOfRvaAndSizes));
 	ParseDataDirectories(opt->DataDirectory, opt->NumberOfRvaAndSizes);
 }
 
 // no BaseOfData in IMAGE_OPTIONAL_HEADER64
-void PEDisector::ParseOptionalHeader64(PIMAGE_OPTIONAL_HEADER64 opt)
+void PEDisector::ParseOptionalHeader64(PIMAGE_OPTIONAL_HEADER64 opt, PIMAGE_DOS_HEADER dos)
 {
-	fhInsertEntry((unsigned char*)&opt->Magic, sizeof(opt->Magic), "Magic", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->MajorLinkerVersion, sizeof(opt->MajorLinkerVersion), "MajorLinkerVersion", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->MinorLinkerVersion, sizeof(opt->MinorLinkerVersion), "MinorLinkerVersion", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfCode, sizeof(opt->SizeOfCode), "SizeOfCode", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfInitializedData, sizeof(opt->SizeOfInitializedData), "SizeOfInitializedData", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfUninitializedData, sizeof(opt->SizeOfUninitializedData), "SizeOfUninitializedData", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->AddressOfEntryPoint, sizeof(opt->AddressOfEntryPoint), "AddressOfEntryPoint", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->BaseOfCode, sizeof(opt->BaseOfCode), "BaseOfCode", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->ImageBase, sizeof(opt->ImageBase), "ImageBase", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SectionAlignment, sizeof(opt->SectionAlignment), "SectionAlignment", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->FileAlignment, sizeof(opt->FileAlignment), "FileAlignment", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->MajorOperatingSystemVersion, sizeof(opt->MajorOperatingSystemVersion), "MajorOperatingSystemVersion", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->MinorOperatingSystemVersion, sizeof(opt->MinorOperatingSystemVersion), "MinorOperatingSystemVersion", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->MajorSubsystemVersion, sizeof(opt->MajorSubsystemVersion), "MajorSubsystemVersion", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->MinorSubsystemVersion, sizeof(opt->MinorSubsystemVersion), "MinorSubsystemVersion", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->Win32VersionValue, sizeof(opt->Win32VersionValue), "Win32VersionValue", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfImage, sizeof(opt->SizeOfImage), "SizeOfImage", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfHeaders, sizeof(opt->SizeOfHeaders), "SizeOfHeaders", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->CheckSum, sizeof(opt->CheckSum), "CheckSum", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->Subsystem, sizeof(opt->Subsystem), "Subsystem", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->DllCharacteristics, sizeof(opt->DllCharacteristics), "DllCharacteristics", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfStackReserve, sizeof(opt->SizeOfStackReserve), "SizeOfStackReserve", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfStackCommit, sizeof(opt->SizeOfStackCommit), "SizeOfStackCommit", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfHeapReserve, sizeof(opt->SizeOfHeapReserve), "SizeOfHeapReserve", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->SizeOfHeapCommit, sizeof(opt->SizeOfHeapCommit), "SizeOfHeapCommit", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->LoaderFlags, sizeof(opt->LoaderFlags), "LoaderFlags", m_ParsedOptionalHeader);
-	fhInsertEntry((unsigned char*)&opt->NumberOfRvaAndSizes, sizeof(opt->NumberOfRvaAndSizes), "NumberOfRvaAndSizes", m_ParsedOptionalHeader);
+	fhInsertEntry((unsigned char*)&opt->Magic, sizeof(opt->Magic), "Magic", m_ParsedOptionalHeader,																		dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, Magic));
+	fhInsertEntry((unsigned char*)&opt->MajorLinkerVersion, sizeof(opt->MajorLinkerVersion), "MajorLinkerVersion", m_ParsedOptionalHeader,								dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, MajorLinkerVersion));
+	fhInsertEntry((unsigned char*)&opt->MinorLinkerVersion, sizeof(opt->MinorLinkerVersion), "MinorLinkerVersion", m_ParsedOptionalHeader,								dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, MinorLinkerVersion));
+	fhInsertEntry((unsigned char*)&opt->SizeOfCode, sizeof(opt->SizeOfCode), "SizeOfCode", m_ParsedOptionalHeader,														dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, SizeOfCode));
+	fhInsertEntry((unsigned char*)&opt->SizeOfInitializedData, sizeof(opt->SizeOfInitializedData), "SizeOfInitializedData", m_ParsedOptionalHeader,						dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, SizeOfInitializedData));
+	fhInsertEntry((unsigned char*)&opt->SizeOfUninitializedData, sizeof(opt->SizeOfUninitializedData), "SizeOfUninitializedData", m_ParsedOptionalHeader,				dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, SizeOfUninitializedData));
+	fhInsertEntry((unsigned char*)&opt->AddressOfEntryPoint, sizeof(opt->AddressOfEntryPoint), "AddressOfEntryPoint", m_ParsedOptionalHeader,							dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, AddressOfEntryPoint));
+	fhInsertEntry((unsigned char*)&opt->BaseOfCode, sizeof(opt->BaseOfCode), "BaseOfCode", m_ParsedOptionalHeader,														dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, BaseOfCode));
+	fhInsertEntry((unsigned char*)&opt->ImageBase, sizeof(opt->ImageBase), "ImageBase", m_ParsedOptionalHeader,															dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, ImageBase));
+	fhInsertEntry((unsigned char*)&opt->SectionAlignment, sizeof(opt->SectionAlignment), "SectionAlignment", m_ParsedOptionalHeader,									dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, SectionAlignment));
+	fhInsertEntry((unsigned char*)&opt->FileAlignment, sizeof(opt->FileAlignment), "FileAlignment", m_ParsedOptionalHeader,												dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, FileAlignment));
+	fhInsertEntry((unsigned char*)&opt->MajorOperatingSystemVersion, sizeof(opt->MajorOperatingSystemVersion), "MajorOperatingSystemVersion", m_ParsedOptionalHeader,	dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, MajorOperatingSystemVersion));
+	fhInsertEntry((unsigned char*)&opt->MinorOperatingSystemVersion, sizeof(opt->MinorOperatingSystemVersion), "MinorOperatingSystemVersion", m_ParsedOptionalHeader,	dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, MinorOperatingSystemVersion));
+	fhInsertEntry((unsigned char*)&opt->MajorSubsystemVersion, sizeof(opt->MajorSubsystemVersion), "MajorSubsystemVersion", m_ParsedOptionalHeader,						dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, MajorSubsystemVersion));
+	fhInsertEntry((unsigned char*)&opt->MinorSubsystemVersion, sizeof(opt->MinorSubsystemVersion), "MinorSubsystemVersion", m_ParsedOptionalHeader,						dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, MinorSubsystemVersion));
+	fhInsertEntry((unsigned char*)&opt->Win32VersionValue, sizeof(opt->Win32VersionValue), "Win32VersionValue", m_ParsedOptionalHeader,									dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, Win32VersionValue));
+	fhInsertEntry((unsigned char*)&opt->SizeOfImage, sizeof(opt->SizeOfImage), "SizeOfImage", m_ParsedOptionalHeader,													dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, SizeOfImage));
+	fhInsertEntry((unsigned char*)&opt->SizeOfHeaders, sizeof(opt->SizeOfHeaders), "SizeOfHeaders", m_ParsedOptionalHeader,												dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, SizeOfHeaders));
+	fhInsertEntry((unsigned char*)&opt->CheckSum, sizeof(opt->CheckSum), "CheckSum", m_ParsedOptionalHeader,															dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, CheckSum));
+	fhInsertEntry((unsigned char*)&opt->Subsystem, sizeof(opt->Subsystem), "Subsystem", m_ParsedOptionalHeader,															dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, Subsystem));
+	fhInsertEntry((unsigned char*)&opt->DllCharacteristics, sizeof(opt->DllCharacteristics), "DllCharacteristics", m_ParsedOptionalHeader,								dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, DllCharacteristics));
+	fhInsertEntry((unsigned char*)&opt->SizeOfStackReserve, sizeof(opt->SizeOfStackReserve), "SizeOfStackReserve", m_ParsedOptionalHeader,								dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, SizeOfStackReserve));
+	fhInsertEntry((unsigned char*)&opt->SizeOfStackCommit, sizeof(opt->SizeOfStackCommit), "SizeOfStackCommit", m_ParsedOptionalHeader,									dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, SizeOfStackCommit));
+	fhInsertEntry((unsigned char*)&opt->SizeOfHeapReserve, sizeof(opt->SizeOfHeapReserve), "SizeOfHeapReserve", m_ParsedOptionalHeader,									dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, SizeOfHeapReserve));
+	fhInsertEntry((unsigned char*)&opt->SizeOfHeapCommit, sizeof(opt->SizeOfHeapCommit), "SizeOfHeapCommit", m_ParsedOptionalHeader,									dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, SizeOfHeapCommit));
+	fhInsertEntry((unsigned char*)&opt->LoaderFlags, sizeof(opt->LoaderFlags), "LoaderFlags", m_ParsedOptionalHeader,													dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, LoaderFlags));
+	fhInsertEntry((unsigned char*)&opt->NumberOfRvaAndSizes, sizeof(opt->NumberOfRvaAndSizes), "NumberOfRvaAndSizes", m_ParsedOptionalHeader,							dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, NumberOfRvaAndSizes));
 	ParseDataDirectories(opt->DataDirectory, opt->NumberOfRvaAndSizes);
 }
 
@@ -273,14 +282,14 @@ void PEDisector::ParseOptionalHeader(PIMAGE_DOS_HEADER dos)
 		m_b64bit = false;
 		auto nt = (PIMAGE_NT_HEADERS32)((unsigned char*)dos + dos->e_lfanew);
 		auto opt = &nt->OptionalHeader;
-		ParseOptionalHeader32(opt);
+		ParseOptionalHeader32(opt, dos);
 	}
 	else if (data == IMAGE_FILE_MACHINE_AMD64 || data == IMAGE_FILE_MACHINE_IA64)
 	{
 		m_b64bit = true;
 		auto nt = (PIMAGE_NT_HEADERS64)((unsigned char*)dos + dos->e_lfanew);
 		auto opt = &nt->OptionalHeader;
-		ParseOptionalHeader64(opt);
+		ParseOptionalHeader64(opt, dos);
 	}
 }
 
@@ -290,6 +299,7 @@ void PEDisector::ParseDataDirectories(PIMAGE_DATA_DIRECTORY dd, DWORD num_dd)
 	{
 		dd_Entry entry;
 		auto& dd_data = dd[i];
+		entry.m_Name = DataDirIndexToString(i);
 		toByteVector((unsigned char*)&dd_data.Size, sizeof(dd_data.Size), entry.m_Size);
 		toByteVector((unsigned char*)&dd_data.VirtualAddress, sizeof(dd_data.VirtualAddress), entry.m_VirtualAddress);
 		m_ParsedDataDirectory_Opt.push_back(entry);
@@ -348,16 +358,16 @@ void PEDisector::ParseSectionHeaders64(PIMAGE_DOS_HEADER dos)
 		auto section = (PIMAGE_SECTION_HEADER)sectionAddr;
 		fh_Section entry;
 		entry.m_Name = std::string((char*)section->Name);
-		fhInsertEntry((unsigned char*)&section->Misc.PhysicalAddress, sizeof(section->Misc.PhysicalAddress), "Misc.PhysicalAddress", entry.m_SectionData);
-		fhInsertEntry((unsigned char*)&section->Misc.VirtualSize, sizeof(section->Misc.VirtualSize), "Misc.VirtualSize", entry.m_SectionData);
-		fhInsertEntry((unsigned char*)&section->VirtualAddress, sizeof(section->VirtualAddress), "VirtualAddress", entry.m_SectionData);
-		fhInsertEntry((unsigned char*)&section->SizeOfRawData, sizeof(section->SizeOfRawData), "SizeOfRawData", entry.m_SectionData);
-		fhInsertEntry((unsigned char*)&section->PointerToRawData, sizeof(section->PointerToRawData), "PointerToRawData", entry.m_SectionData);
-		fhInsertEntry((unsigned char*)&section->PointerToRelocations, sizeof(section->PointerToRelocations), "PointerToRelocations", entry.m_SectionData);
-		fhInsertEntry((unsigned char*)&section->PointerToLinenumbers, sizeof(section->PointerToLinenumbers), "PointerToLineNumbers", entry.m_SectionData);
-		fhInsertEntry((unsigned char*)&section->NumberOfRelocations, sizeof(section->NumberOfRelocations), "NumberOfRelocations", entry.m_SectionData);
-		fhInsertEntry((unsigned char*)&section->NumberOfLinenumbers, sizeof(section->NumberOfLinenumbers), "NumberOfLineNumbers", entry.m_SectionData);
-		fhInsertEntry((unsigned char*)&section->Characteristics, sizeof(section->Characteristics), "Characteristics", entry.m_SectionData);
+		fhInsertEntry((unsigned char*)&section->Misc.PhysicalAddress, sizeof(section->Misc.PhysicalAddress),	"Misc.PhysicalAddress", entry.m_SectionData);
+		fhInsertEntry((unsigned char*)&section->Misc.VirtualSize, sizeof(section->Misc.VirtualSize),			"Misc.VirtualSize", entry.m_SectionData);
+		fhInsertEntry((unsigned char*)&section->VirtualAddress, sizeof(section->VirtualAddress),				"VirtualAddress", entry.m_SectionData);
+		fhInsertEntry((unsigned char*)&section->SizeOfRawData, sizeof(section->SizeOfRawData),					"SizeOfRawData", entry.m_SectionData);
+		fhInsertEntry((unsigned char*)&section->PointerToRawData, sizeof(section->PointerToRawData),			"PointerToRawData", entry.m_SectionData);
+		fhInsertEntry((unsigned char*)&section->PointerToRelocations, sizeof(section->PointerToRelocations),	"PointerToRelocations", entry.m_SectionData);
+		fhInsertEntry((unsigned char*)&section->PointerToLinenumbers, sizeof(section->PointerToLinenumbers),	"PointerToLineNumbers", entry.m_SectionData);
+		fhInsertEntry((unsigned char*)&section->NumberOfRelocations, sizeof(section->NumberOfRelocations),		"NumberOfRelocations", entry.m_SectionData);
+		fhInsertEntry((unsigned char*)&section->NumberOfLinenumbers, sizeof(section->NumberOfLinenumbers),		"NumberOfLineNumbers", entry.m_SectionData);
+		fhInsertEntry((unsigned char*)&section->Characteristics, sizeof(section->Characteristics),				"Characteristics", entry.m_SectionData);
 		m_ParsedSectionHeaders.push_back(entry);
 		/*
 			We will add a function here to get hash/entropy of each section,
@@ -655,7 +665,10 @@ void PEDisector::ParseRichHeader(PIMAGE_DOS_HEADER dos)
 	    entry.m_useCount = (uint32_t)((unsigned char)decrypted_rich[i + 7] << 24) |(unsigned char)decrypted_rich[i + 6] << 16 | (unsigned char)decrypted_rich[i + 5] << 8 | (unsigned char)decrypted_rich[i + 4];
 		entry.m_prodIDMeaning = RichHdr_translateProdId(entry.m_prodID);
 		entry.m_vsVersion = RichHdr_ProdIdToVSversion(entry.m_prodID);
-		memcpy(entry.m_raw, &decrypted_rich[i], 8);
+		for (int j = 0; j < 8; j++)
+		{
+			entry.m_Raw.push_back(decrypted_rich[i + j]);
+		}
 		m_ParsedRichHeader.m_Entries[(i / 8) - 2] = entry;
 	}
 

@@ -315,3 +315,44 @@ std::string RichHdr_translateProdId(WORD prodId)
 	}
 	return "?";
 }
+
+std::string DataDirIndexToString(int index)
+{
+	switch (index)
+	{
+	case 0:
+		return "Export Directory";
+	case 1:
+		return "Import Directory";
+	case 2:
+		return "Resource Directory";
+	case 3:
+		return "Exception Directory";
+	case 4:
+		return "Certification Directory";
+	case 5:
+		return "Base Relocation Table";
+	case 6:
+		return "Debug Directory";
+	case 7:
+		return "Archiecture Specific Data";
+	case 8:
+		return "GlobalPtr Register RVA";
+	case 9:
+		return "TLS Directory";
+	case 10:
+		return "Load Configuration";
+	case 11:
+		return "Bound Import Directory";
+	case 12:
+		return "Import Address Table";
+	case 13:
+		return "Delayed Import Descriptors";
+	case 14:
+		return "CLR/.NET Header";
+	case 15:
+		return "Reserved";
+	default:
+		return "";
+	}
+}

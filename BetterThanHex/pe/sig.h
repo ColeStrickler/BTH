@@ -5,3 +5,5 @@
 std::string RichHdr_ProdIdToVSversion(WORD i);
 
 std::string RichHdr_translateProdId(WORD prodId);
+
+std::string DataDirIndexToString(int index);

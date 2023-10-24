@@ -21,7 +21,7 @@ enum class PEINFO : short
 	DOS_HEADER,
 	RICH_HEADER,
 	FILE_HEADER,
-	NT_HEADER,
+	OPTIONAL_HEADER,
 	DATA_DIRECTORIES,
 	SECTION_HEADERS,
 	IMPORTS,
@@ -74,7 +74,10 @@ public:
 	void HandlePeDisplay();
 	void HandleDosHeader();
 	void HandleRichHeader();
-	void HandleNtHeader();
+	void HandleFileHeader();
+	void HandleOptionalHeader();
+	void HandleDataDirectories();
+	void HandleSectionHeaders();
 
 	void HandleImports();
 

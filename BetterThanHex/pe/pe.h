@@ -13,6 +13,7 @@
 
 struct fh_Entry
 {
+	DWORD m_Offset;
 	std::string m_Name;
 	std::vector<unsigned char> m_Bytes;
 };
@@ -49,7 +50,7 @@ struct fh_LibraryImport
 
 struct RichHeaderEntry
 {
-	unsigned char m_raw[8];
+	std::vector<unsigned char> m_Raw;
 	WORD m_prodID;
 	WORD m_buildID;
 	DWORD m_useCount;
@@ -64,6 +65,9 @@ struct fh_RichHeader
 };
 
 
+std::string RichHeaderMeaning(RichHeaderEntry& entry);
+
+
 class PEDisector
 {
 public:
@@ -73,9 +77,9 @@ public:
 	
 
 	void ParseDosHeader(PIMAGE_DOS_HEADER dos);
-	void ParseFileHeader(PIMAGE_FILE_HEADER fh);
-	void ParseOptionalHeader32(PIMAGE_OPTIONAL_HEADER32 opt);
-	void ParseOptionalHeader64(PIMAGE_OPTIONAL_HEADER64 opt);
+	void ParseFileHeader(PIMAGE_FILE_HEADER fh, PIMAGE_DOS_HEADER dos);
+	void ParseOptionalHeader32(PIMAGE_OPTIONAL_HEADER32 opt, PIMAGE_DOS_HEADER dos);
+	void ParseOptionalHeader64(PIMAGE_OPTIONAL_HEADER64 opt, PIMAGE_DOS_HEADER dos);
 	void ParseOptionalHeader(PIMAGE_DOS_HEADER dos);
 	void ParseDataDirectories(PIMAGE_DATA_DIRECTORY dd, DWORD num_dd);
 	void ParseSectionHeaders(PIMAGE_DOS_HEADER dos);

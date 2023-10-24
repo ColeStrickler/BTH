@@ -523,8 +523,8 @@ void Manager::HandlePeFileFormatButtons()
 	if (ImGui::Button("File Header"))
 		m_PEselected = PEINFO::FILE_HEADER;
 	ImGui::SameLine();
-	if (ImGui::Button("NT Header"))
-		m_PEselected = PEINFO::NT_HEADER;
+	if (ImGui::Button("Optional Header"))
+		m_PEselected = PEINFO::OPTIONAL_HEADER;
 	ImGui::SameLine();
 	if (ImGui::Button("Data Directories"))
 		m_PEselected = PEINFO::DATA_DIRECTORIES;
@@ -544,19 +544,40 @@ void Manager::HandlePeDisplay()
 	switch (m_PEselected)
 	{
 		case PEINFO::DOS_HEADER:
+		{
 			HandleDosHeader();
+			return;
+		}	
 		case PEINFO::RICH_HEADER:
+		{
 			HandleRichHeader();
-		case PEINFO::FILE_HEADER:	
 			return;
-		case PEINFO::NT_HEADER:
-			HandleNtHeader();
+		}
+		case PEINFO::FILE_HEADER:
+		{
+			HandleFileHeader();
+			return;
+		}
+		case PEINFO::OPTIONAL_HEADER:
+		{
+			HandleOptionalHeader();
+			return;
+		}
 		case PEINFO::DATA_DIRECTORIES:
+		{
+			HandleDataDirectories();
 			return;
+		}
 		case PEINFO::SECTION_HEADERS:
+		{
+			HandleSectionHeaders();
 			return;
+		}
 		case PEINFO::IMPORTS:
+		{
 			HandleImports();
+			return;
+		}
 		case PEINFO::EXPORTS:
 			return;
 		default:
@@ -566,33 +587,183 @@ void Manager::HandlePeDisplay()
 
 void Manager::HandleDosHeader()
 {
-	for (auto& e : m_PEDisector->m_ParsedDosHeader)
+	if (ImGui::BeginTable("Dos Header", 3))
 	{
-		ImGui::Text(e.m_Name.c_str());
-		ImGui::SameLine();
-		ImGui::Text(ucharVecToHexString(e.m_Bytes).c_str());
+		ImGui::TableSetupColumn("Offset");
+		ImGui::TableSetupColumn("Field Name");
+		ImGui::TableSetupColumn("Value");
+		ImGui::TableHeadersRow();
+
+		auto dosHeader = m_PEDisector->m_ParsedDosHeader;
+		auto rows = dosHeader.size();
+		for (int r = 0; r < rows; r++)
+		{
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text("%x", dosHeader[r].m_Offset);
+			ImGui::TableSetColumnIndex(1);
+			ImGui::Text(dosHeader[r].m_Name.c_str());
+			ImGui::TableSetColumnIndex(2);
+			ImGui::Text(ucharVecToHexString(dosHeader[r].m_Bytes).c_str());
+		}
+		ImGui::EndTable();
 	}
 }
 
 void Manager::HandleRichHeader()
 {
-	auto key = m_PEDisector->m_ParsedRichHeader.key;
+	auto richHeader = m_PEDisector->m_ParsedRichHeader;
+	auto rhEntries = richHeader.m_Entries;
+	auto ex_Entry = richHeader.m_Entries[0];
+	
+	auto num_Rows = rhEntries.size();
+	auto key = richHeader.key;
 
-	ImGui::Text("Rich Header Key: %x %x %x %x\n", key[0], key[1], key[2], key[3]);
-	for (auto& e : m_PEDisector->m_ParsedRichHeader.m_Entries)
+	if (ImGui::BeginTable("Rich Header", 7))
 	{
-		ImGui::Text(RichHdr_ProdIdToVSversion(e.m_prodID).c_str());
+		ImGui::TableSetupColumn("Field Name");
+		ImGui::TableSetupColumn("Value");
+		ImGui::TableSetupColumn("Meaning");
+		ImGui::TableSetupColumn("ProductId");
+		ImGui::TableSetupColumn("BuildId");
+		ImGui::TableSetupColumn("Use Count");
+		ImGui::TableSetupColumn("VS Version");
+		ImGui::TableHeadersRow();
+
+		auto rows = rhEntries.size();
+		for (int r = 0; r < rows; r++)
+		{
+			ImGui::TableNextRow();
+			auto current = rhEntries[r];
+			// handle new row
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text("Comp ID");
+			ImGui::TableSetColumnIndex(1);
+			ImGui::Text(ucharVecToHexString(current.m_Raw).c_str());
+			ImGui::TableSetColumnIndex(2);
+			ImGui::Text(RichHeaderMeaning(current).c_str());
+			ImGui::TableSetColumnIndex(3);
+			ImGui::Text(current.m_prodIDMeaning.c_str());
+			ImGui::TableSetColumnIndex(4);
+			ImGui::Text("%d", current.m_buildID);
+			ImGui::TableSetColumnIndex(5);
+			ImGui::Text("%d", current.m_useCount);
+			ImGui::TableSetColumnIndex(6);
+			ImGui::Text(current.m_vsVersion.c_str());
+		}
+		ImGui::EndTable();
 	}
 }
 
-void Manager::HandleNtHeader()
+void Manager::HandleFileHeader()
 {
-	for (auto& e : m_PEDisector->m_ParsedOptionalHeader)
+	auto fileHeader = m_PEDisector->m_ParsedFileHeader;
+	if (ImGui::BeginTable("File Header", 3))
 	{
-		ImGui::Text(e.m_Name.c_str());
-		ImGui::SameLine();
-		ImGui::Text(ucharVecToHexString(e.m_Bytes).c_str());
+		ImGui::TableSetupColumn("Offset");
+		ImGui::TableSetupColumn("Field Name");
+		ImGui::TableSetupColumn("Value");
+		ImGui::TableHeadersRow();
+
+		auto rows = fileHeader.size();
+		for (int r = 0; r < rows; r++)
+		{
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text("%x", fileHeader[r].m_Offset);
+			ImGui::TableSetColumnIndex(1);
+			ImGui::Text(fileHeader[r].m_Name.c_str());
+			ImGui::TableSetColumnIndex(2);
+			ImGui::Text(ucharVecToHexString(fileHeader[r].m_Bytes).c_str());
+		}
+		ImGui::EndTable();
 	}
+}
+
+void Manager::HandleOptionalHeader()
+{
+	if (ImGui::BeginTable("Optional Header", 3))
+	{
+		ImGui::TableSetupColumn("Offset");
+		ImGui::TableSetupColumn("Field Name");
+		ImGui::TableSetupColumn("Value");
+		ImGui::TableHeadersRow();
+
+		auto ntHeader = m_PEDisector->m_ParsedOptionalHeader;
+		auto rows = ntHeader.size();
+		for (int r = 0; r < rows; r++)
+		{
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text("%x", ntHeader[r].m_Offset);
+			ImGui::TableSetColumnIndex(1);
+			ImGui::Text(ntHeader[r].m_Name.c_str());
+			ImGui::TableSetColumnIndex(2);
+			ImGui::Text(ucharVecToHexString(ntHeader[r].m_Bytes).c_str());
+		}
+		ImGui::EndTable();
+	}
+}
+
+void Manager::HandleDataDirectories()
+{
+	if (ImGui::BeginTable("Data Directories", 3))
+	{
+		auto& dataDir = m_PEDisector->m_ParsedDataDirectory_Opt;
+		int num_rows = dataDir.size();
+		ImGui::TableSetupColumn("Field Name");
+		ImGui::TableSetupColumn("Virtual Address");
+		ImGui::TableSetupColumn("Size");
+		ImGui::TableHeadersRow();
+		for (int i = 0; i < num_rows; i++)
+		{
+			auto& curr = dataDir[i];
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text(curr.m_Name.c_str());
+			ImGui::TableSetColumnIndex(1);
+			ImGui::Text(ucharVecToHexString(curr.m_VirtualAddress).c_str());
+			ImGui::TableSetColumnIndex(2);
+			ImGui::Text(ucharVecToHexString(curr.m_Size).c_str());
+		}
+		ImGui::EndTable();
+	}
+}
+
+void Manager::HandleSectionHeaders()
+{
+	if (ImGui::BeginTable("Section Header", 11))
+	{	
+		auto sectionHeader = m_PEDisector->m_ParsedSectionHeaders;
+		ImGui::TableSetupColumn("Field Name");
+		ImGui::TableSetupColumn("Misc.PhysicalAddress");
+		ImGui::TableSetupColumn("Misc.VirtualSize");
+		ImGui::TableSetupColumn("VirtualAddress");
+		ImGui::TableSetupColumn("SizeOfRawData");
+		ImGui::TableSetupColumn("PointerToRawData");
+		ImGui::TableSetupColumn("PointerToRelocations");
+		ImGui::TableSetupColumn("PointerToLineNumbers");
+		ImGui::TableSetupColumn("NumberOfRelocations");
+		ImGui::TableSetupColumn("NumberOfLineNumbers");
+		ImGui::TableSetupColumn("Characteristics");
+		ImGui::TableHeadersRow();
+		auto rows = sectionHeader.size();
+		for (int r = 0; r < rows; r++)
+		{
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text(sectionHeader[0].m_Name.c_str());
+			for (int i = 0; i < 10; i++)
+			{
+				ImGui::TableSetColumnIndex(i+1);
+				ImGui::Text(ucharVecToHexString(sectionHeader[r].m_SectionData[i].m_Bytes).c_str());
+			}
+		}
+		ImGui::EndTable();
+	}
+
+
+
 }
 
 void Manager::HandleImports()
@@ -629,15 +800,12 @@ void Manager::HandleImports()
 				ImGui::TableSetColumnIndex(column);
 				ImGui::Text(ucharVecToHexString(imports[row].m_ImportDescriptorData[column-1].m_Bytes).c_str());
 			}
-
 		}
 		ImGui::EndTable();
 	}
 	ImGui::EndChild();
 	
 	ImGui::NextColumn();
-	
-	
 	ImGui::BeginChild("PEtableRegion2", ImVec2(m_PEtableWidth/2, m_PEtableHeight), true);
 	
 	if (m_PEselectedImportView < m_PEDisector->m_ParsedImports.size())
