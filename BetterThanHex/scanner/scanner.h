@@ -11,6 +11,9 @@
 #include "../Dependencies/imgui/imgui_impl_opengl3.h"
 
 
+class Manager;
+
+
 class Scanner
 {
 public:
@@ -29,9 +32,15 @@ public:
 	*/
 	std::vector<unsigned long long> scan_bytes(const std::vector<unsigned char>& pattern, const std::vector<unsigned char>& bytes, float* progress);
 	std::vector<unsigned long long> scan_bytes(const std::vector<unsigned char>& pattern, const std::vector<unsigned char>& bytes, std::vector<unsigned long long>& out, size_t offset);
-	std::vector<unsigned long long> scan_file(FileBrowser* fb, const std::vector<unsigned char>& pattern,  float& progress);
+	std::vector<unsigned long long> scan_file(FileBrowser* fb, const std::vector<unsigned char>& pattern, Manager* mgr);
 
 	std::vector<unsigned long long> m_ByteMatches;
+	
+
+
+	
+	
+	std::chrono::duration<double> m_ScanTime;
 private:
 	
 };

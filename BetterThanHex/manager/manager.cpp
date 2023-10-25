@@ -397,7 +397,6 @@ void Manager::HandleByteScannerPopupButton()
 {
 	if (ImGui::Button("Scan"))
 	{
-		m_ByteScannerProgress = 0.0f;
 
 		m_ByteScannerPattern.clear();
 		for (int i = 0; i < m_ByteScannerInputPatternSize; i++)
@@ -407,9 +406,9 @@ void Manager::HandleByteScannerPopupButton()
 		m_ByteScannerBytesScanned = m_FileBrowser->m_LoadedFileSize;
 
 
-		auto start_time = std::chrono::high_resolution_clock::now();
+		
 		//m_ByteScanner->scan_file(m_FileBrowser, m_ByteScannerPattern, m_ByteScannerProgress);
-		std::thread scan_thread(&Scanner::scan_file, m_ByteScanner, m_FileBrowser, std::ref(m_ByteScannerPattern), std::ref(m_ByteScannerProgress));
+		std::thread scan_thread(&Scanner::scan_file, m_ByteScanner, m_FileBrowser, std::ref(m_ByteScannerPattern), this);
 		{
 			std::lock_guard<std::mutex> lock(m_ThreadManagerMutex);
 			m_ActiveThreads.push_back(std::make_unique<std::thread>(std::move(scan_thread)));
@@ -419,8 +418,7 @@ void Manager::HandleByteScannerPopupButton()
 		
 		//m_ByteScanner->scan_bytes(m_ByteScannerPattern, m_FileBrowser->m_FileLoadData, &m_ByteScannerProgress);
 		//std::thread(&Scanner::scan_bytes, this->m_ByteScanner, m_ByteScannerPattern, m_FileBrowser->m_FileLoadData, &m_ByteScannerProgress);
-		auto end_time = std::chrono::high_resolution_clock::now();
-		m_ByteScannerTimeTaken = end_time - start_time;
+		
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("Close"))
@@ -432,14 +430,18 @@ void Manager::HandleByteScannerPopupButton()
 
 
 	ImGui::ProgressBar(m_ByteScannerProgress, ImVec2(150, 30));
-	ImGui::Text("Scanned %d bytes in %.2f ms.", m_ByteScannerBytesScanned, m_ByteScannerTimeTaken.count());
-	ImGui::Text("Found %d matches.", m_ByteScanner->m_ByteMatches.size());
-
-	for (int i = 0; i < m_ByteScanner->m_ByteMatches.size(); i++)
+	if (m_bByteScannerFinished)
 	{
-		auto& inst = m_ByteScanner->m_ByteMatches[i];
-		ImGui::TextColored(GreenFont, "0x%x", inst);
+		ImGui::Text("Scanned %d bytes in %.2f s.", m_ByteScannerBytesScanned, m_ByteScanner->m_ScanTime.count());
+		ImGui::Text("Found %d matches.", m_ByteScanner->m_ByteMatches.size());
+
+		for (int i = 0; i < min(m_ByteScanner->m_ByteMatches.size(), MAX_SCANNER_DISPLAY); i++)
+		{
+			auto& inst = m_ByteScanner->m_ByteMatches[i];
+			ImGui::TextColored(GreenFont, "0x%x", inst);
+		}
 	}
+	
 
 }
 

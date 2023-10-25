@@ -1,5 +1,7 @@
 #include "scanner.h"
 
+#include "../manager/manager.h"
+
 Scanner::Scanner()
 {
 }
@@ -140,22 +142,31 @@ std::vector<unsigned long long> Scanner::scan_bytes(const std::vector<unsigned c
 	return out;
 }
 
-std::vector<unsigned long long> Scanner::scan_file(FileBrowser* fb, const std::vector<unsigned char>& pattern, float& progress)
+std::vector<unsigned long long> Scanner::scan_file(FileBrowser* fb, const std::vector<unsigned char>& pattern, Manager* mgr)
 {
+	mgr->SetByteScannerProgress(0.0f);
+	auto start_time = std::chrono::high_resolution_clock::now();
+	mgr->SetByteScannerFinished(false);
+	
 	auto& file_size = fb->m_LoadedFileSize;
 	DWORD scanned = 0;
 	std::vector<unsigned long long> ret;
+
 	while (scanned < file_size)
 	{
 		DWORD read;
 		auto bytes = fb->LoadBytes(scanned, 200000, &read);
 		scan_bytes(pattern, bytes, ret, scanned);
 		scanned += read;
-		progress = min((float)(scanned / file_size) * 100.0f, 100.0f);
+		auto progress = min((static_cast<float>(scanned) / file_size), 100.0f);
+		mgr->SetByteScannerProgress(progress);
 	}
-	//printf("Total Scanned: %d\n", scanned);
+
 	m_ByteMatches.clear();
 	m_ByteMatches = ret;
-	
+	auto end_time = std::chrono::high_resolution_clock::now();
+	mgr->SetByteScannerFinished(true);
+	m_ScanTime = end_time - start_time;
+
 	return ret;
 }

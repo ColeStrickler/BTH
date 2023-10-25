@@ -12,6 +12,9 @@
 #include "..\pe\pe.h"
 #include <mutex>
 
+#define MAX_SCANNER_DISPLAY 25
+
+
 
 static ImVec4 RedFont = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
 static ImVec4 GreenFont = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
@@ -71,7 +74,8 @@ public:
 	void HandleByteScannerPopupButton();
 	void HandleByteScannerButton();
 	void HandleByteScannerPopup();
-
+	inline void SetByteScannerProgress(const float& progress) { m_ByteScannerProgress = progress; };
+	inline void SetByteScannerFinished(const bool& finished) { m_bByteScannerFinished = finished; };
 
 
 	// PE Disector Functions
@@ -145,10 +149,11 @@ private:
 	char m_ByteScannerPatternEditorBuffer[3];
 	unsigned char m_ByteScannerPatternBuffer[17];
 	int m_ByteScannerBytesScanned;
-	std::chrono::duration<double> m_ByteScannerTimeTaken;
 	float m_ByteScannerProgress;
+	bool m_bByteScannerFinished;
 	std::vector<unsigned char> m_ByteScannerPattern;
 	std::vector<unsigned int> m_ByteScannerMatches;
+	
 
 
 	/*
