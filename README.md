@@ -1,6 +1,5 @@
 # In Progress
 ## Long Term
-- pattern scan database
 - Windows API/Syscall scanner
 - Program Digraph
 - Yara Rule Scanner
