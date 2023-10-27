@@ -12,7 +12,6 @@
 - Make edits saveable
 - Add resource and export parser to PE viewer, besides this basics of PE parser are done
 - Add comment API for disassembler
-- Add negative sizeofbytes to scanner so we do not miss things at boundary limits
 
 ### Its coming along - need to start making it prettier
 
