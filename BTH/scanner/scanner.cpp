@@ -142,10 +142,10 @@ std::vector<unsigned long long> Scanner::scan_bytes(const std::vector<unsigned c
 	return out;
 }
 
-std::vector<unsigned long long> Scanner::scan_file(FileBrowser* fb, const std::vector<unsigned char>& pattern, Manager* mgr)
-{
-	mgr->SetByteScannerProgress(0.0f);
+std::vector<unsigned long long> Scanner::byte_scan_file(FileBrowser* fb, const std::vector<unsigned char>& pattern, Manager* mgr)
+{	
 	auto start_time = std::chrono::high_resolution_clock::now();
+	mgr->SetByteScannerProgress(0.0f);
 	mgr->SetByteScannerFinished(false);
 	
 	auto& file_size = fb->m_LoadedFileSize;
@@ -155,9 +155,13 @@ std::vector<unsigned long long> Scanner::scan_file(FileBrowser* fb, const std::v
 	while (scanned < file_size)
 	{
 		DWORD read;
-		auto bytes = fb->LoadBytes(scanned, 200000, &read);
+		auto bytes = fb->LoadBytes(scanned, SCANNER_LOAD_MAX, &read);
 		scan_bytes(pattern, bytes, ret, scanned);
-		scanned += read;
+		/*
+			we back up by the size of the pattern because we do not want to miss
+			cases when the pattern lies on the boundary of our load limit
+		*/ 
+		scanned += (read > SCANNER_LOAD_MAX - pattern.size() ?  read - pattern.size() : read);
 		auto progress = min((static_cast<float>(scanned) / file_size), 100.0f);
 		mgr->SetByteScannerProgress(progress);
 	}
@@ -166,7 +170,96 @@ std::vector<unsigned long long> Scanner::scan_file(FileBrowser* fb, const std::v
 	m_ByteMatches = ret;
 	auto end_time = std::chrono::high_resolution_clock::now();
 	mgr->SetByteScannerFinished(true);
-	m_ScanTime = end_time - start_time;
+	m_ByteScanTime = end_time - start_time;
 
 	return ret;
+}
+
+StringMatches Scanner::string_scan_file(FileBrowser* fb, Manager* mgr, int min_string_length)
+{	
+	auto start_time = std::chrono::high_resolution_clock::now();
+	mgr->SetStringScannerProgress(0.0f);
+	mgr->SetStringScannerFinished(false);
+	auto& file_size = fb->m_LoadedFileSize;
+	DWORD scanned = 0;
+	StringMatches ret;
+
+	while (scanned < file_size)
+	{
+		DWORD read;
+		auto bytes = fb->LoadBytes(scanned, SCANNER_LOAD_MAX, &read);
+		string_scan(bytes, ret, scanned, min_string_length);
+		
+		/*
+			we back up by the size of the pattern because we do not want to miss
+			cases when the pattern lies on the boundary of our load limit
+		*/
+		scanned += (read > SCANNER_LOAD_MAX - min_string_length ? read - min_string_length : read);
+		auto progress = min((static_cast<float>(scanned) / file_size), 100.0f);
+		mgr->SetStringScannerProgress(progress);
+	}
+
+
+	m_StringMatches.m_StandardStrings.clear();
+	m_StringMatches.m_UnicodeStrings.clear();
+	m_StringMatches = ret;
+	auto end_time = std::chrono::high_resolution_clock::now();
+	m_StringScanTime = end_time - start_time;
+	mgr->SetStringScannerFinished(true);
+	return m_StringMatches;
+}
+
+
+
+StringMatches Scanner::string_scan(const std::vector<unsigned char>& bytes, StringMatches& out, size_t offset, int min_string_length)
+{
+	char asciiLowBound = '!';
+	char asciiHighBound = '~';
+
+	wchar_t unicodeLowBound = L'!';
+	wchar_t unicodeHighBound = L'~';
+
+	StringMatch<std::string> currAsciiMatch;
+	StringMatch<std::wstring> currUnicodeMatch;
+
+	for (int i = 0; i < bytes.size() - min_string_length; i++)
+	{
+		if (bytes[i] >= asciiLowBound && bytes[i] <= asciiHighBound)
+		{
+			currAsciiMatch.m_StringVal += bytes[i];
+		}
+		else
+		{
+			if (currAsciiMatch.m_StringVal.size() >= min_string_length)
+			{
+				currAsciiMatch.m_Offset = i - currAsciiMatch.m_StringVal.size();
+				out.m_StandardStrings.push_back(currAsciiMatch);
+			}
+			currAsciiMatch.m_Offset = 0x0;
+			currAsciiMatch.m_StringVal.clear();
+		}
+
+		if (i % 2 == 0)	// only mess with unicode every two bytes because thats how much wide chars use
+		{
+			wchar_t* wc = (wchar_t*)(bytes.data() + i);
+			wchar_t wide_c = *wc;
+			if (wide_c >= unicodeLowBound && wide_c <= unicodeHighBound)
+			{
+				currUnicodeMatch.m_StringVal += wide_c;
+			}
+			else
+			{
+				if (currUnicodeMatch.m_StringVal.size() >= min_string_length)
+				{
+					currUnicodeMatch.m_Offset = i - currUnicodeMatch.m_StringVal.size() * 2;
+					out.m_UnicodeStrings.push_back(currUnicodeMatch);
+				}
+				currUnicodeMatch.m_Offset = 0x0;
+				currUnicodeMatch.m_StringVal.clear();
+			}
+		}
+	}
+
+
+	return out;
 }

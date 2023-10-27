@@ -11,7 +11,7 @@
 #include <chrono>
 #include "..\pe\pe.h"
 #include <mutex>
-
+#include <iostream>
 #define MAX_SCANNER_DISPLAY 25
 
 
@@ -76,6 +76,13 @@ public:
 	void HandleByteScannerPopup();
 	inline void SetByteScannerProgress(const float& progress) { m_ByteScannerProgress = progress; };
 	inline void SetByteScannerFinished(const bool& finished) { m_bByteScannerFinished = finished; };
+
+	// String Scanner Functions
+	void HandleStringScanner();
+	void HandleStringScannerButton();
+	void HandleStringScannerPopup();
+	inline void SetStringScannerProgress(const float& progress) { m_StringScannerProgress = progress; };
+	inline void SetStringScannerFinished(const bool& finished) { m_bStringScannerFinished = finished; };
 
 
 	// PE Disector Functions
@@ -153,8 +160,17 @@ private:
 	bool m_bByteScannerFinished;
 	std::vector<unsigned char> m_ByteScannerPattern;
 	std::vector<unsigned int> m_ByteScannerMatches;
-	
 
+
+
+	/*
+		STRING SCANNER
+	*/
+	bool m_bStringScannerShowPopup;
+	float m_StringScannerProgress;
+	bool m_bStringScannerFinished;
+	int m_StringScannerMinStringLength;
+	int m_StringScannerMaxStringsDisplayed;
 
 	/*
 		PE PARSER

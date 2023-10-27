@@ -24,7 +24,7 @@ static std::string ucharVecToHexString(std::vector<unsigned char>& vec)
 	classes under the hood that provide the heavy lifting
 */
 Manager::Manager() : m_HexDumpWidth(475), m_HexDumpHeight(400), m_DecoderWidth(475), m_DecoderHeight(400), m_PEtableWidth(1600), m_PEtableHeight(500),
-					m_DecoderNumInstructionsDisplayed(200), m_MaximumLoadSize(200000)
+	m_DecoderNumInstructionsDisplayed(200), m_MaximumLoadSize(200000), m_StringScannerMaxStringsDisplayed(250)
 {
 	m_FileBrowser = new FileBrowser(m_MaximumLoadSize);
 	m_Decoder = new Decoder();
@@ -62,6 +62,10 @@ void Manager::RenderUI()
 	HandleHexdump();
 	
 	HandleByteScanner();
+	ImGui::SameLine();
+	HandleStringScanner();
+
+
 	ImGui::NextColumn();
 	/*
 		COLUMN 2
@@ -159,7 +163,8 @@ void Manager::DisplayFileNavigator()
 					if (m_PEDisector != nullptr)
 						delete m_PEDisector;
 					m_PEDisector = new PEDisector(m_FileBrowser->m_LoadedFileName);
-				}			
+				}
+
 			}
 		}
 	}
@@ -405,20 +410,11 @@ void Manager::HandleByteScannerPopupButton()
 		}
 		m_ByteScannerBytesScanned = m_FileBrowser->m_LoadedFileSize;
 
-
-		
-		//m_ByteScanner->scan_file(m_FileBrowser, m_ByteScannerPattern, m_ByteScannerProgress);
-		std::thread scan_thread(&Scanner::scan_file, m_ByteScanner, m_FileBrowser, std::ref(m_ByteScannerPattern), this);
+		std::thread scan_thread(&Scanner::byte_scan_file, m_ByteScanner, m_FileBrowser, std::ref(m_ByteScannerPattern), this);
 		{
 			std::lock_guard<std::mutex> lock(m_ThreadManagerMutex);
 			m_ActiveThreads.push_back(std::make_unique<std::thread>(std::move(scan_thread)));
 		}
-
-
-		
-		//m_ByteScanner->scan_bytes(m_ByteScannerPattern, m_FileBrowser->m_FileLoadData, &m_ByteScannerProgress);
-		//std::thread(&Scanner::scan_bytes, this->m_ByteScanner, m_ByteScannerPattern, m_FileBrowser->m_FileLoadData, &m_ByteScannerProgress);
-		
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("Close"))
@@ -432,7 +428,7 @@ void Manager::HandleByteScannerPopupButton()
 	ImGui::ProgressBar(m_ByteScannerProgress, ImVec2(150, 30));
 	if (m_bByteScannerFinished)
 	{
-		ImGui::Text("Scanned %d bytes in %.2f s.", m_ByteScannerBytesScanned, m_ByteScanner->m_ScanTime.count());
+		ImGui::Text("Scanned %d bytes in %.2f s.", m_ByteScannerBytesScanned, m_ByteScanner->m_ByteScanTime.count());
 		ImGui::Text("Found %d matches.", m_ByteScanner->m_ByteMatches.size());
 
 		for (int i = 0; i < min(m_ByteScanner->m_ByteMatches.size(), MAX_SCANNER_DISPLAY); i++)
@@ -528,6 +524,112 @@ void Manager::HandleByteScannerPopup()
 		ImGui::EndPopup();
 	}
 
+}
+
+void Manager::HandleStringScanner()
+{
+	HandleStringScannerButton();
+	HandleStringScannerPopup();
+}
+
+void Manager::HandleStringScannerButton()
+{
+	if (ImGui::Button("String Scan"))
+	{
+		m_bStringScannerShowPopup = !m_bStringScannerShowPopup;
+	}
+}
+
+void Manager::HandleStringScannerPopup()
+{
+
+
+	// HEX EDIT POPUP
+	if (m_bStringScannerShowPopup)
+	{
+		ImGui::OpenPopup("String Scanner Popup");
+	}
+	ImGui::SetNextWindowSize(ImVec2(700, 400));
+	if (ImGui::BeginPopup("String Scanner Popup"))
+	{
+		ImGui::InputInt("Minimum String Size", &m_StringScannerMinStringLength, 1, 20, ImGuiInputTextFlags_CharsDecimal);
+		if (ImGui::Button("Scan"))
+		{
+			std::thread scan_thread(&Scanner::string_scan_file, m_ByteScanner, m_FileBrowser, this, std::ref(m_StringScannerMinStringLength));
+			{
+				std::lock_guard<std::mutex> lock(m_ThreadManagerMutex);
+				m_ActiveThreads.push_back(std::make_unique<std::thread>(std::move(scan_thread)));
+			}
+		}
+		ImGui::SameLine();
+
+		if (ImGui::Button("Close"))
+		{
+			m_bStringScannerShowPopup = false;
+			ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+			return;
+		}
+
+		auto matches = m_ByteScanner->m_StringMatches;
+		if (m_bStringScannerFinished)
+		{
+			ImGui::Text("Scanned %d bytes for strings in %.2f s", m_FileBrowser->m_LoadedFileSize, m_ByteScanner->m_StringScanTime);
+			ImGui::Text("%d ASCII matches, %d Unicode Matches", matches.m_StandardStrings.size(), matches.m_UnicodeStrings.size());
+		}
+		else
+		{
+			ImGui::SameLine();
+			ImGui::ProgressBar(m_StringScannerProgress, ImVec2(200, 20));
+		}
+
+		
+		if (matches.m_StandardStrings.size() || matches.m_UnicodeStrings.size())
+		{
+			ImGui::Columns(2);
+			if (ImGui::BeginTable("Ascii Strings", 2))
+			{
+				ImGui::TableSetupColumn("Offset");
+				ImGui::TableSetupColumn("ASCII String");
+				ImGui::TableHeadersRow();
+
+				auto strings = matches.m_StandardStrings;
+				auto rows = strings.size();
+				for (int r = 0; r < min(rows, m_StringScannerMaxStringsDisplayed); r++)
+				{
+					
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("%x", strings[r].m_Offset);
+					ImGui::TableSetColumnIndex(1);
+					ImGui::Text("%s", strings[r].m_StringVal.c_str());
+				}
+				ImGui::EndTable();
+			}
+			ImGui::NextColumn();
+			if (ImGui::BeginTable("Unicode Strings", 2))
+			{
+				ImGui::TableSetupColumn("Offset");
+				ImGui::TableSetupColumn("UNICODE String");
+				ImGui::TableHeadersRow();
+
+				auto strings = matches.m_UnicodeStrings;
+				auto rows = strings.size();
+				for (int r = 0; r < min(rows, m_StringScannerMaxStringsDisplayed); r++)
+				{
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("%x", strings[r].m_Offset);
+					ImGui::TableSetColumnIndex(1);
+					ImGui::Text("%ws", strings[r].m_StringVal.c_str());
+				}
+				ImGui::EndTable();
+			}
+
+		}
+
+		ImGui::EndPopup();
+	}
 }
 
 
