@@ -15,4 +15,4 @@
 
 ### Its coming along - need to start making it prettier
 
-![prettier](https://github.com/ColeStrickler/BetterThanHex/assets/82488869/7a292ad1-f120-47ca-9736-62e537c81e2f)
+![stringscan](https://github.com/ColeStrickler/BTH/assets/82488869/958d34bf-7e8b-4021-b2b1-29b223ab1b9c)
