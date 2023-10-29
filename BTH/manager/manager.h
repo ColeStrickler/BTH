@@ -10,6 +10,8 @@
 #include "../scanner/scanner.h"
 #include <chrono>
 #include "..\pe\pe.h"
+#include "..\db\db.h"
+#include "imgui_stylewrappers.h"
 #include <mutex>
 #include <iostream>
 #define MAX_SCANNER_DISPLAY 25
@@ -35,7 +37,18 @@ enum class PEINFO : short
 };
 
 
+enum class SETTINGS_DISPLAY : short
+{
+	VISUALS,
+	PERFORMANCE
+};
 
+
+
+/*
+	The Manager class is a state machine that handles most of the interactivity of the UI as well as orchestrates
+	classes under the hood that provide the heavy lifting
+*/
 class Manager
 {
 public:
@@ -45,6 +58,16 @@ public:
 	// Manager Functions
 	void RenderUI();
 	void BeginThreadManagerThread();
+
+
+
+	// DB|SAVED SETTINGS FUNCTIONS
+	void HandleSettings();
+	void HandleSettingsButton();
+	void HandleSettingsPopup();
+	void HandleSettingsDisplay();
+	void DisplayVisualSettings();
+	void DisplayPerformanceSettings();
 
 
 
@@ -120,6 +143,22 @@ private:
 	std::vector<std::unique_ptr<std::thread>> m_ActiveThreads;
 	// These are all mutex protected ^
 	bool m_bThreadManagerExit;
+
+
+
+
+
+
+
+	/*
+		DB|SAVED SETTINGS
+	*/
+	db_mgr* m_DataBaseManager;
+	bool m_bSettingsShowPopup;
+	SETTINGS_DISPLAY m_SettingsCurrentDisplay;
+	VISUALS_INDEX m_CurrentSelectedVisualsIndex;
+	ImVec4 m_VisualSettingsColorSelector;
+
 
 
 	/*

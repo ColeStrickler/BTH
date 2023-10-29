@@ -19,16 +19,14 @@ static std::string ucharVecToHexString(std::vector<unsigned char>& vec)
 
 
 
-/*
-	The Manager class is a state machine that handles most of the interactivity of the UI as well as orchestracts
-	classes under the hood that provide the heavy lifting
-*/
+
 Manager::Manager() : m_HexDumpWidth(475), m_HexDumpHeight(400), m_DecoderWidth(475), m_DecoderHeight(400), m_PEtableWidth(1600), m_PEtableHeight(500),
 	m_DecoderNumInstructionsDisplayed(200), m_MaximumLoadSize(200000), m_StringScannerMaxStringsDisplayed(250)
 {
 	m_FileBrowser = new FileBrowser(m_MaximumLoadSize);
 	m_Decoder = new Decoder();
 	m_ByteScanner = new Scanner();
+	m_DataBaseManager = new db_mgr();
 	auto t = std::thread(&Manager::BeginThreadManagerThread, this);
 	m_ThreadManagerThread = std::move(t);
 }
@@ -52,6 +50,8 @@ void Manager::RenderUI()
 		COLUMN 1
 	*/
 	HandleFileNavigator();
+	ImGui::SameLine();
+	HandleSettings();
 	// Hex Dump
 	auto sel = DrawHexValuesWindow();
 	if (sel != -1)
@@ -96,6 +96,119 @@ void Manager::BeginThreadManagerThread()
 			m_ActiveThreads.clear();
 		}
 	}
+}
+
+void Manager::HandleSettings()
+{
+	HandleSettingsButton();
+	HandleSettingsPopup();
+}
+
+void Manager::HandleSettingsButton()
+{
+	if (ImGui::Button("Settings"))
+	{
+		m_bSettingsShowPopup = true;
+	}
+}
+
+void Manager::HandleSettingsPopup()
+{
+	if (false)
+	{
+		//ImGui::OpenPopup("Settings");
+	}
+
+	
+	if (m_bSettingsShowPopup)
+	{
+		ImGui::SetNextWindowPos(ImVec2(200, 200), ImGuiCond_Always);
+		ImGui::SetNextWindowSize(ImVec2(800, 500)); // Set the desired size
+		ImGui::Begin("Custom Popup", &m_bSettingsShowPopup);
+		HandleSettingsDisplay();
+		
+
+		if (ImGui::Button("Done"))
+		{
+			m_bSettingsShowPopup = false;
+			//ImGui::CloseCurrentPopup();
+		}
+		//ImGui::EndPopup();
+
+		ImGui::End();
+	}
+
+}
+
+void Manager::HandleSettingsDisplay()
+{
+	switch (m_SettingsCurrentDisplay)
+	{
+		case SETTINGS_DISPLAY::VISUALS:
+		{
+			DisplayVisualSettings();
+			return;
+		}
+		case SETTINGS_DISPLAY::PERFORMANCE:
+		{
+			DisplayPerformanceSettings();
+			return;
+		}
+		default:
+			return;
+	}
+}
+
+void Manager::DisplayVisualSettings()
+{
+	ImGui::Columns(2);
+	if (ImGui::BeginTable("Visual Settings", 5))
+	{
+		ImGui::TableSetupColumn("Setting",ImGuiTableColumnFlags_WidthFixed, 200.0f);
+		ImGui::TableSetupColumn("R", ImGuiTableColumnFlags_None);
+		ImGui::TableSetupColumn("G", ImGuiTableColumnFlags_None);
+		ImGui::TableSetupColumn("B", ImGuiTableColumnFlags_None);
+		ImGui::TableSetupColumn("A", ImGuiTableColumnFlags_None);
+		ImGui::TableHeadersRow();
+		auto rows = COLORSETTINGS_QUERYSTRING.size();
+		for (int r = 0; r < rows; r++)
+		{
+			auto curr_color = m_DataBaseManager->GetColorSetting((VISUALS_INDEX)r);
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			if (ImGui::Selectable(COLORSETTINGS_QUERYSTRING[r].c_str()))
+			{
+				m_CurrentSelectedVisualsIndex = (VISUALS_INDEX)r;
+				m_VisualSettingsColorSelector = curr_color;
+			}
+			ImGui::TableSetColumnIndex(1);
+			ImGui::Text("%.2f", curr_color.x);
+			ImGui::TableSetColumnIndex(2);
+			ImGui::Text("%.2f", curr_color.y);
+			ImGui::TableSetColumnIndex(3);
+			ImGui::Text("%.2f", curr_color.z);
+			ImGui::TableSetColumnIndex(4);
+			ImGui::Text("%.2f", curr_color.w);
+		}
+		ImGui::EndTable();
+	}
+	ImGui::NextColumn();
+	ImGui::Text("Currently selected: %s", COLORSETTINGS_QUERYSTRING[(int)m_CurrentSelectedVisualsIndex].c_str());
+	ImGui::SliderFloat("Red",	&m_VisualSettingsColorSelector.x, 0.0f, 1.0f);
+	ImGui::SliderFloat("Green", &m_VisualSettingsColorSelector.y, 0.0f, 1.0f);
+	ImGui::SliderFloat("Blue",	&m_VisualSettingsColorSelector.z, 0.0f, 1.0f);
+	ImGui::ColorButton("MyColoredBox", m_VisualSettingsColorSelector, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoTooltip, ImVec2(300, 20));
+
+	// Update Database with changes and reload settings to match updates
+	if (ImGui::Button("Apply Changes"))
+	{
+		m_DataBaseManager->UpdateColorSetting(COLORSETTINGS_QUERYSTRING[(int)m_CurrentSelectedVisualsIndex], m_VisualSettingsColorSelector);
+	}
+	ImGui::SameLine();
+}
+
+void Manager::DisplayPerformanceSettings()
+{
 }
 
 
@@ -184,7 +297,11 @@ void Manager::HandleFileNavigator()
 
 int Manager::DrawHexValuesWindow()
 {
-	ImGui::BeginChild("ScrollingRegion", ImVec2(m_HexDumpWidth, m_HexDumpHeight), true);
+	
+	ImGui::BeginChild("ScrollingRegion", ImVec2(m_HexDumpWidth, m_HexDumpHeight), false);
+	stylewrappers::HexDumpBackgroundStyle(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::HEXDUMP_BACKGROUND_COLOR));
+
+
 	std::vector<unsigned char>& hexValues = m_FileBrowser->m_FileLoadData;
 	if (hexValues.size() == 0)
 	{
@@ -196,15 +313,16 @@ int Manager::DrawHexValuesWindow()
 	int& offset = m_GlobalOffset;
 
 	// Create a scrollable region
-	
-	ImGuiStyle& style = ImGui::GetStyle();
-	ImVec4 originalButtonBgColor = style.Colors[ImGuiCol_Button];
 
 	int total = 0;
 	const int bytesPerRow = 16;
 	const int numRows = 16;
 	int ret = -1;
 
+
+	// Some vertical spacing 
+	ImGui::Spacing();
+	ImGui::Spacing();
 
 	for (int row = 0; row < numRows; ++row) {
 		for (int col = 0; col < bytesPerRow; ++col) {
@@ -221,7 +339,9 @@ int Manager::DrawHexValuesWindow()
 				else
 					value += (char)hexValues[index];
 
-				if (ImGui::Button(value.c_str(), ImVec2(20, 20)))
+
+				//ImGui::Button(value.c_str(), ImVec2(20, 20);
+				if (stylewrappers::Button(value, m_DataBaseManager->GetColorSetting(VISUALS_INDEX::HEXDUMP_BUTTON_COLOR)))
 				{
 					ret = index;
 				}
@@ -240,9 +360,6 @@ int Manager::DrawHexValuesWindow()
 }
 void Manager::HandleHexdumpPopups()
 {
-
-
-
 	// HEX EDIT POPUP
 	if (m_bShowHexDumpHexEditPopup)
 	{

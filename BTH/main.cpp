@@ -4,10 +4,10 @@
 #include <iostream>
 #include "UI/ui.h"
 #include "manager/manager.h"
+#include "utils/utils.h"
 
 #define WINDOW_WIDTH 1600
 #define WINDOW_HEIGHT 1000
-#define ASSERT(x) if(!(x)) __debugbreak();
 
 bool GLLogCall(const char* func, const char* file, int line)
 {
@@ -20,7 +20,7 @@ bool GLLogCall(const char* func, const char* file, int line)
 	return true;
 
 }
-
+;
 void GLClearError()
 {
 	while (glGetError() != GL_NO_ERROR) {};
@@ -29,19 +29,6 @@ void GLClearError()
 #define GLCall(x) GLClearError();\
 	x;\
 	ASSERT(GLLogCall(#x, __FILE__, __LINE__));
-
-
-
-int selectedHexValue = -1;
-std::vector<int> selectedIndices; // Store selected indices
-static char hexValueBuffer[4] = "";
-bool showAscii = false;
-bool m_bHexDumpShowOffsetPopup = false;
-int offset = 0;
-char offsetValueBuffer[8];
-
-
-
 
 
 
