@@ -1,10 +1,10 @@
 # In Progress
 ## Long Term
-- pattern scan database
 - Windows API/Syscall scanner
 - Program Digraph
 - Yara Rule Scanner
 - Python3 scripting
+- Memory Dump Analysis(custom structures, structure overlay, follow RVAs, general disassembly)
 
 ## To DO
 - Add custom colors
