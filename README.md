@@ -7,12 +7,10 @@
 - Memory Dump Analysis(custom structures, structure overlay, follow RVAs, general disassembly)
 
 ## To DO
-- Add custom colors
-- Get SQLite setup for customization permanence
 - Make edits saveable
 - Add resource and export parser to PE viewer, besides this basics of PE parser are done
 - Add comment API for disassembler
 
-### Its coming along - need to start making it prettier
-
-![stringscan](https://github.com/ColeStrickler/BTH/assets/82488869/958d34bf-7e8b-4021-b2b1-29b223ab1b9c)
+### Color settings are now completely customizable
+![customizable colors](https://github.com/ColeStrickler/BTH/assets/82488869/6e6c8d85-af15-4717-8f99-96799bd04380)
+![colorsettings](https://github.com/ColeStrickler/BTH/assets/82488869/3f51fc05-570a-4528-a885-f99b3be47ef1)
