@@ -7,12 +7,27 @@
 
 namespace stylewrappers
 {
-	bool Button(const std::string& ButtonText, const ImVec4& Color, ImVec2 ButtonSize = ImVec2(20, 20));
+	bool Button(const std::string& ButtonText, const ImVec4& Color, ImVec2 ButtonSize = ImVec2(100, 20),
+		const ImVec4& TextColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
 
 
 	void HexDumpBackgroundStyle(const ImVec4& Color);
 
+	bool ColoredSelectable(const std::string& SelectableText, const ImVec4& Color);
 
+
+
+	class TableStyle
+	{
+	public:
+		TableStyle(const ImVec4& ColHeaderBgColor, const ImVec4& ColHeaderTextColor);
+		~TableStyle();
+
+
+	private:
+		ImVec4 m_OriginalColHeaderColor;
+		ImVec4 m_OriginalColHeaderTextColor;
+	};
 
 
 };

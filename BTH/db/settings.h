@@ -13,6 +13,9 @@ enum class VISUALS_INDEX : short
 {
 	// GENERAL VISUALS
 	BACKGROUND_COLOR,
+	BUTTON_COLOR,
+	BUTTON_TEXT_COLOR,
+	TEXT_COLOR,
 
 	// HEXDUMP VISUALS
 	HEXDUMP_BACKGROUND_COLOR,
@@ -23,13 +26,17 @@ enum class VISUALS_INDEX : short
 	DISASSEMBLY_INST1_COLOR,
 	DISASSEMBLY_INST2_COLOR,
 	DISASSEMBLY_INST3_COLOR,
+	DISASSEMBLY_INST4_COLOR,
 
 	// MEMORY DUMP VISUALS
 
 
 	// PE DUMP VISUALS
 	PEPARSER_BUTTON_COLOR,
-	PEPARSER_TEXT_COLOR
+	PEPARSER_TEXT_COLOR,
+	PEPARSER_BUTTONTEXT_COLOR,
+	PEPARSER_COLHEADER_COLOR,
+	PEPARSER_COLHEADERTEXT_COLOR
 };
 
 
@@ -48,7 +55,8 @@ struct ManagerSettings
 
 	
 	inline ImVec4 GetColorSettings(VISUALS_INDEX index) const { return m_ColorSettings[(int)index]; };
-
+	// Info Functions
+	inline int VisualsSize() { return m_ColorSettings.size(); };
 
 private:
 	std::vector<ImVec4> m_ColorSettings;

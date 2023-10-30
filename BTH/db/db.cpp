@@ -53,7 +53,6 @@ db_mgr::db_mgr()
 	int err = sqlite3_open(BTH_DBSTRING, &m_DB);
 	if (err)
 	{
-		printf("failed to open sqlite3 db!\n");
 		m_ErrorCode = err;
 		return;
 	}
@@ -64,7 +63,6 @@ db_mgr::db_mgr()
 	}
 	else
 	{
-		printf("file opened successfully\n");
 		file.close();
 	}
 		
@@ -104,7 +102,6 @@ void db_mgr::LoadState()
 
 void db_mgr::CreateDatabase()
 {
-	printf("creating db!\n");
 	int err;
 	const char* CREATE_COLOR_TABLE = "CREATE TABLE IF NOT EXISTS ColorSettings (\
 		id INTEGER PRIMARY KEY AUTOINCREMENT,\
@@ -116,7 +113,6 @@ void db_mgr::CreateDatabase()
 
 	if ((err = sqlite3_exec(m_DB, CREATE_COLOR_TABLE, 0, 0, 0)) != SQLITE_OK)
 	{
-		printf("Error creating color table %d\n", err);
 		m_ErrorCode = err;
 		return;
 	}
@@ -126,7 +122,6 @@ void db_mgr::CreateDatabase()
 		auto INSERT_QUERY = FormatInsertQuery("ColorSettings", COLOR_SETTINGS_SCHEMA, default_setting);
 		if ((err = sqlite3_exec(m_DB, INSERT_QUERY.c_str(), 0, 0, 0)) != SQLITE_OK)
 		{
-			printf("Error inserting %s\nErrorCode: %d\n", INSERT_QUERY.c_str(), err);
 			m_ErrorCode = err;
 			return;
 		}
