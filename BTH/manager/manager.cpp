@@ -52,14 +52,25 @@ void Manager::RenderUI()
 	HandleFileNavigator();
 	ImGui::SameLine();
 	HandleSettings();
+
+
 	// Hex Dump
-	auto sel = DrawHexValuesWindow();
-	if (sel != -1)
+	if (!m_bShowMemoryDumpView)
 	{
-		m_bShowHexDumpHexEditPopup = true;
-		m_HexDumpSelectedIndex = sel;
+		auto sel = DrawHexValuesWindow();
+		if (sel != -1)
+		{
+			m_bShowHexDumpHexEditPopup = true;
+			m_HexDumpSelectedIndex = sel;
+		}
+		HandleHexdump();
 	}
-	HandleHexdump();
+	else // Memory Dump
+	{
+
+	}
+
+
 	
 	HandleByteScanner();
 	ImGui::SameLine();
@@ -70,7 +81,13 @@ void Manager::RenderUI()
 	/*
 		COLUMN 2
 	*/
-	HandleDecoder();
+	if (!m_bShowMemoryDumpView)
+		HandleDecoder();
+	
+
+
+
+
 	ImGui::Columns(1);
 	HandlePeDump();
 	
@@ -98,6 +115,27 @@ void Manager::BeginThreadManagerThread()
 	}
 }
 
+
+
+void Manager::HandleMemoryDump()
+{
+}
+
+void Manager::HandleMemoryDumpButton()
+{
+}
+
+void Manager::HandleMemoryDumpCommandLine()
+{
+}
+
+void Manager::HandleMemoryDumpStructureEditor()
+{
+}
+
+
+
+
 void Manager::HandleSettings()
 {
 	HandleSettingsButton();
@@ -114,12 +152,7 @@ void Manager::HandleSettingsButton()
 
 void Manager::HandleSettingsPopup()
 {
-	if (false)
-	{
-		//ImGui::OpenPopup("Settings");
-	}
 
-	
 	if (m_bSettingsShowPopup)
 	{
 		ImGui::SetNextWindowPos(ImVec2(200, 200), ImGuiCond_Always);
@@ -274,6 +307,15 @@ void Manager::DisplayFileNavigator()
 				m_FileBrowser->SetInputPath(c_str);
 				auto fb_retcode = m_FileBrowser->LoadFile(str);
 				m_Decoder->DecodeBytes(m_FileBrowser->m_FileLoadData);
+
+
+				auto memdump = new MemDump({ {2, MEMDUMPDISPLAY::ASCII}, { 2, MEMDUMPDISPLAY::HEX }, { 2, MEMDUMPDISPLAY::HEX } });
+				auto dd = memdump->GetDisplayData(m_FileBrowser->m_FileLoadData, 0);
+				for (auto& x : dd)
+				{
+					std::cout << x.m_Display << "\t[SIZE: " << x.m_Size << "]" << std::endl;
+				}
+
 
 				if (fb_retcode == FB_RETCODE::FILE_CHANGE_LOAD)
 				{

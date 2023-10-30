@@ -12,6 +12,7 @@
 #include "..\pe\pe.h"
 #include "..\db\db.h"
 #include "imgui_stylewrappers.h"
+#include "..\memdump\memdump.h"
 #include <mutex>
 #include <iostream>
 #define MAX_SCANNER_DISPLAY 25
@@ -58,6 +59,13 @@ public:
 	// Manager Functions
 	void RenderUI();
 	void BeginThreadManagerThread();
+
+
+	// Memory Dump Functions
+	void HandleMemoryDump();
+	void HandleMemoryDumpButton();
+	void HandleMemoryDumpCommandLine();
+	void HandleMemoryDumpStructureEditor();
 
 
 
@@ -136,6 +144,8 @@ private:
 	int m_GlobalOffset;
 	char m_OffsetEditorBuffer[9];
 	int m_MaximumLoadSize;	// the maximum amount of a file we can load at a time
+	bool m_bShowMemoryDumpView;
+
 
 	// These are all mutex protected V
 	std::thread m_ThreadManagerThread;
@@ -143,6 +153,7 @@ private:
 	std::vector<std::unique_ptr<std::thread>> m_ActiveThreads;
 	// These are all mutex protected ^
 	bool m_bThreadManagerExit;
+
 
 
 
