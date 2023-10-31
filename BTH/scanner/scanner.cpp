@@ -221,7 +221,7 @@ StringMatches Scanner::string_scan(const std::vector<unsigned char>& bytes, Stri
 
 	StringMatch<std::string> currAsciiMatch;
 	StringMatch<std::wstring> currUnicodeMatch;
-
+	StringMatch<std::wstring> currUnicodeMatch2;
 	for (int i = 0; i < bytes.size() - min_string_length; i++)
 	{
 		if (bytes[i] >= asciiLowBound && bytes[i] <= asciiHighBound)
@@ -232,7 +232,7 @@ StringMatches Scanner::string_scan(const std::vector<unsigned char>& bytes, Stri
 		{
 			if (currAsciiMatch.m_StringVal.size() >= min_string_length)
 			{
-				currAsciiMatch.m_Offset = i - currAsciiMatch.m_StringVal.size();
+				currAsciiMatch.m_Offset = i - currAsciiMatch.m_StringVal.size() + offset;
 				out.m_StandardStrings.push_back(currAsciiMatch);
 			}
 			currAsciiMatch.m_Offset = 0x0;
@@ -251,11 +251,30 @@ StringMatches Scanner::string_scan(const std::vector<unsigned char>& bytes, Stri
 			{
 				if (currUnicodeMatch.m_StringVal.size() >= min_string_length)
 				{
-					currUnicodeMatch.m_Offset = i - currUnicodeMatch.m_StringVal.size() * 2;
+					currUnicodeMatch.m_Offset = i - currUnicodeMatch.m_StringVal.size() * 2 + offset;
 					out.m_UnicodeStrings.push_back(currUnicodeMatch);
 				}
 				currUnicodeMatch.m_Offset = 0x0;
 				currUnicodeMatch.m_StringVal.clear();
+			}
+		}
+		else // we also check to see if the unicode string starts on an odd offset 
+		{
+			wchar_t* wc = (wchar_t*)(bytes.data() + i);
+			wchar_t wide_c = *wc;
+			if (wide_c >= unicodeLowBound && wide_c <= unicodeHighBound)
+			{
+				currUnicodeMatch2.m_StringVal += wide_c;
+			}
+			else
+			{
+				if (currUnicodeMatch2.m_StringVal.size() >= min_string_length)
+				{
+					currUnicodeMatch2.m_Offset = i - currUnicodeMatch2.m_StringVal.size() * 2 + offset;
+					out.m_UnicodeStrings.push_back(currUnicodeMatch2);
+				}
+				currUnicodeMatch2.m_Offset = 0x0;
+				currUnicodeMatch2.m_StringVal.clear();
 			}
 		}
 	}

@@ -170,7 +170,8 @@ void Manager::HandleMemoryDumpButton()
 
 void Manager::HandleMemoryDumpStructureView()
 {
-	int offset = m_GlobalOffset % m_MaximumLoadSize;
+	// need to fix this offset
+	int offset = (m_GlobalOffset - m_FileBrowser->m_CurrentBounds[0]) % m_MaximumLoadSize;
 	if (m_MemoryDumpNewStructure_CurrentlySelected >= m_MemoryDumpStructureVec.size())
 		return;
 	auto structure = m_MemoryDumpStructureVec[m_MemoryDumpNewStructure_CurrentlySelected];
@@ -388,8 +389,8 @@ void Manager::HandleMemoryDumpMemberEditPopup()
 			}
 			case 1:
 			{
-				const char* items[] = { "INT","LONG_INT","UNSIGNED_INT","UNSIGNED_LONGLONG","ASCII","UNICODE","HEX", };
-				for (int i = 0; i < 7; i++)
+				const char* items[] = { "INT","LONG_INT","UNSIGNED_INT","UNSIGNED_LONGLONG","ASCII","UNICODE","HEX", "BOOL"};
+				for (int i = 0; i < 8; i++)
 				{
 					if (ImGui::Selectable(items[i]))
 					{

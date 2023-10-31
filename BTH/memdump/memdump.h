@@ -15,6 +15,7 @@ enum class MEMDUMPDISPLAY : short
 	ASCII,
 	UNICODE,
 	HEX,
+	BOOL
 };
 
 std::string DumpDisplayType2String(MEMDUMPDISPLAY type);

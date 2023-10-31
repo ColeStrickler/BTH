@@ -95,7 +95,6 @@ public:
 	void ParseImports64(PIMAGE_DOS_HEADER dos, std::ifstream& file);
 	void ParseRichHeader(PIMAGE_DOS_HEADER dos);
 
-
 	bool m_bValidPEFile;
 	bool m_bSuccessfulDisection;
 	bool m_b64bit;

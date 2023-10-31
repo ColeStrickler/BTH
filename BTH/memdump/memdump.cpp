@@ -61,6 +61,8 @@ std::string DumpDisplayType2String(MEMDUMPDISPLAY type)
 			return "UNICODE";
 		case MEMDUMPDISPLAY::HEX:
 			return "HEX";
+		case MEMDUMPDISPLAY::BOOL:
+			return "BOOL";
 		default:
 			return "";
 	}
@@ -84,6 +86,8 @@ size_t DumpDisplaySize(MEMDUMPDISPLAY type)
 		return sizeof(wchar_t);
 	case MEMDUMPDISPLAY::HEX:
 		return sizeof(unsigned char);
+	case MEMDUMPDISPLAY::BOOL:
+		return sizeof(bool);
 	default:
 		return 0;
 	}
@@ -191,6 +195,10 @@ static std::string GetDisplayString(std::vector<unsigned char>& bytes, size_t of
 		case MEMDUMPDISPLAY::HEX:
 		{
 			return HexDataToString(bytes, offset, se);
+		}
+		case MEMDUMPDISPLAY::BOOL:
+		{
+			return DataToString<bool>(bytes, offset, se);
 		}
 		default:
 			return "";
