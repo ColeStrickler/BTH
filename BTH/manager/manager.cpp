@@ -29,6 +29,7 @@ Manager::Manager() : m_HexDumpWidth(475), m_HexDumpHeight(400), m_DecoderWidth(4
 	m_DataBaseManager = new db_mgr();
 	auto t = std::thread(&Manager::BeginThreadManagerThread, this);
 	m_ThreadManagerThread = std::move(t);
+	InitDefaultStructs();
 }
 
 Manager::~Manager()
@@ -44,48 +45,65 @@ Manager::~Manager()
 
 void Manager::RenderUI()
 {
-	ImGui::Columns(2);
+	if (!m_bShowMemoryDumpView)
+	{
+		ImGui::Columns(2, "global_cols", true);
+	}
+	else
+	{
+		ImGui::Columns(3, "global_cols", true);
+		
+
+	}
+		
 
 	/*
 		COLUMN 1
 	*/
+
 	HandleFileNavigator();
 	ImGui::SameLine();
 	HandleSettings();
+	ImGui::SameLine();
+	HandleMemoryDumpButton();
 
 
 	// Hex Dump
-	if (!m_bShowMemoryDumpView)
+	auto sel = DrawHexValuesWindow();
+	if (sel != -1)
 	{
-		auto sel = DrawHexValuesWindow();
-		if (sel != -1)
-		{
-			m_bShowHexDumpHexEditPopup = true;
-			m_HexDumpSelectedIndex = sel;
-		}
-		HandleHexdump();
+		m_bShowHexDumpHexEditPopup = true;
+		m_HexDumpSelectedIndex = sel;
 	}
-	else // Memory Dump
-	{
-
-	}
+	HandleHexdump();
 
 
-	
+
 	HandleByteScanner();
 	ImGui::SameLine();
 	HandleStringScanner();
 
-
-	ImGui::NextColumn();
 	/*
 		COLUMN 2
 	*/
+	ImGui::NextColumn();
 	if (!m_bShowMemoryDumpView)
 		HandleDecoder();
-	
+	else
+	{
+		HandleMemoryDumpStructureView();
+	}
+	/*
+		COLUMN 3
 
+		[!] We only have 3 columns in memory dump view
+	*/
 
+	if (m_bShowMemoryDumpView)
+	{
+		ImGui::NextColumn();
+		HandleMemoryDumpStructureEditor();
+	}
 
 
 	ImGui::Columns(1);
@@ -117,21 +135,319 @@ void Manager::BeginThreadManagerThread()
 
 
 
+void Manager::InitDefaultStructs()
+{
+	// load default structures into our structure vector
+	for (auto& def_struct : m_DataBaseManager->m_DefaultStructs)
+	{
+		MemDumpStructure new_struct_def(def_struct.m_Name);
+
+		for (auto& member : def_struct.m_Entry)
+		{
+			new_struct_def.AddEntry(member);
+		}
+		m_MemoryDumpStructureVec.push_back(new_struct_def);
+	}
+}
+
 void Manager::HandleMemoryDump()
 {
+	
 }
+
+
 
 void Manager::HandleMemoryDumpButton()
 {
+	std::string display = (m_bShowMemoryDumpView ? "HexDump" : "MemoryDump");
+
+
+	if (stylewrappers::Button(display, m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	{
+		m_bShowMemoryDumpView = !m_bShowMemoryDumpView;
+	}
 }
 
-void Manager::HandleMemoryDumpCommandLine()
+void Manager::HandleMemoryDumpStructureView()
 {
+	int offset = m_GlobalOffset % m_MaximumLoadSize;
+	if (m_MemoryDumpNewStructure_CurrentlySelected >= m_MemoryDumpStructureVec.size())
+		return;
+	auto structure = m_MemoryDumpStructureVec[m_MemoryDumpNewStructure_CurrentlySelected];
+	ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Currently Selected: %s", structure.m_Name.c_str());
+	if (ImGui::BeginChild("StructureDump", ImVec2(WINDOW_WIDTH / 3, WINDOW_HEIGHT / 2 - 100)))
+	{
+		if (ImGui::BeginTable("Structure Dump View", 4))
+		{
+			{
+				stylewrappers::TableStyle TABLE_STYLE(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
+				ImGui::TableSetupColumn("Field");
+				ImGui::TableSetupColumn("Value");
+				ImGui::TableSetupColumn("Size");
+				ImGui::TableSetupColumn("Type");
+				ImGui::TableHeadersRow();
+			}
+			
+			auto data = structure.GetDisplayData(m_FileBrowser->m_FileLoadData, offset);
+			int rows = data.size();
+			for (int r = 0; r < rows; r++)
+			{
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0);
+				ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "%s", data[r].m_SE.m_GivenName.c_str());;
+				ImGui::TableSetColumnIndex(1);
+				ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "%s", data[r].m_Display.c_str());;
+				ImGui::TableSetColumnIndex(2);
+				ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "%d", data[r].m_SE.m_Size);
+				ImGui::TableSetColumnIndex(3);
+				ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "%s", DumpDisplayType2String(data[r].m_SE.m_Display).c_str());
+			}
+			ImGui::EndTable();
+		}
+
+		ImGui::EndChild();
+	}
+
+
 }
 
 void Manager::HandleMemoryDumpStructureEditor()
 {
+	if (ImGui::BeginChild("StructureEdit", ImVec2(WINDOW_WIDTH/3, WINDOW_HEIGHT/2 - 50)))
+	{
+		ImGui::Columns(2, "StructureEdit_cols", false);
+		ImGui::SetColumnWidth(0, WINDOW_WIDTH / 12);
+
+		if (ImGui::BeginTable("Structure Editor", 1, 0, ImVec2(WINDOW_WIDTH/12, WINDOW_HEIGHT/2)))
+		{
+			{
+				stylewrappers::TableStyle TABLE_STYLE(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
+				ImGui::TableSetupColumn("Structure", ImGuiTableColumnFlags_WidthFixed, WINDOW_WIDTH / 12);
+				ImGui::TableHeadersRow();
+			}
+
+			auto& structVec = m_MemoryDumpStructureVec;
+			auto rows = structVec.size();
+			for (int r = 0; r < rows; r++)
+			{
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0);
+				ImGui::PushID(r);
+				if (stylewrappers::ColoredSelectable(structVec[r].m_Name, m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR)))
+				{
+					m_MemoryDumpNewStructure_CurrentlySelected = r;
+				}
+				ImGui::PopID();
+			}
+			ImGui::EndTable();
+		}
+		ImGui::NextColumn();
+		if (ImGui::BeginTable("Structure Editor", 3))
+		{
+			{
+				stylewrappers::TableStyle TABLE_STYLE(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
+				ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+				ImGui::TableSetupColumn("Data Type", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+				ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+				ImGui::TableHeadersRow();
+			}
+			if (m_MemoryDumpNewStructure_CurrentlySelected < m_MemoryDumpStructureVec.size())
+			{
+				// We call an overload of GetDisplayData(), this one does not set the member variable or overlay struct onto memory
+				auto display_data = m_MemoryDumpStructureVec[m_MemoryDumpNewStructure_CurrentlySelected].GetDisplayData();
+				auto rows = display_data.size();
+				for (int r = 0; r < rows; r++)
+				{
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::PushID(10 * r + 0);
+					if (stylewrappers::ColoredSelectable(display_data[r].m_SE.m_GivenName, m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR)))
+					{
+						m_MemoryDumpNewStructure_MemberSelected.first = r;
+						m_MemoryDumpNewStructure_MemberSelected.second = 0;
+						m_bMemoryDumpShowMemberEditPopup = true;
+					}
+					ImGui::PopID();
+					ImGui::TableSetColumnIndex(1);
+					ImGui::PushID(10 * r + 1);
+					if (stylewrappers::ColoredSelectable(DumpDisplayType2String(display_data[r].m_SE.m_Display), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR)))
+					{
+						m_MemoryDumpNewStructure_MemberSelected.first = r;
+						m_MemoryDumpNewStructure_MemberSelected.second = 1;
+						m_bMemoryDumpShowMemberEditPopup = true;
+					}
+					ImGui::PopID();
+					ImGui::TableSetColumnIndex(2);
+					ImGui::PushID(10 * r + 2);
+					if (stylewrappers::ColoredSelectable(std::to_string(display_data[r].m_SE.m_Size), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR)))
+					{
+						m_MemoryDumpNewStructure_MemberSelected.first = r;
+						m_MemoryDumpNewStructure_MemberSelected.second = 2;
+						m_bMemoryDumpShowMemberEditPopup = true;
+					}
+					ImGui::PopID();
+				}
+			}
+			
+			ImGui::EndTable();
+		}
+		ImGui::EndChild();
+	}
+	HandleMemoryDumpMemberEditPopup();
+	if (stylewrappers::Button("New Struct", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	{
+		m_bMemoryDumpShowAddStructurePopup = true;
+	}
+	HandleMemoryDumpNewStructurePopup();
+	ImGui::SameLine();
+	if (stylewrappers::Button("New Member", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	{
+		if (m_MemoryDumpNewStructure_CurrentlySelected < m_MemoryDumpStructureVec.size())
+		{
+			MemDumpStructEntry se;
+			se.m_Display = MEMDUMPDISPLAY::INT;
+			se.m_Size = 4;
+			m_MemoryDumpStructureVec[m_MemoryDumpNewStructure_CurrentlySelected].AddEntry(se);
+		}
+		
+	}
+	ImGui::SameLine();
+	if (stylewrappers::Button("Remove Member", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	{
+		if (m_MemoryDumpStructureVec.size())
+			m_MemoryDumpStructureVec[m_MemoryDumpNewStructure_CurrentlySelected].RemoveEntry();
+	}
+	ImGui::SameLine();
+	if (stylewrappers::Button("Save Structure", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	{
+		if (m_MemoryDumpNewStructure_CurrentlySelected < m_MemoryDumpStructureVec.size())
+		{
+			auto& structure = m_MemoryDumpStructureVec[m_MemoryDumpNewStructure_CurrentlySelected];
+			m_DataBaseManager->SaveStructure(structure);
+		}
+	}
+
 }
+
+void Manager::HandleMemoryDumpNewStructurePopup()
+{
+
+	if (m_bMemoryDumpShowAddStructurePopup)
+	{
+		ImGui::OpenPopup("New Structure");
+	}
+
+	if (ImGui::BeginPopup("New Structure"))
+	{
+		ImGui::InputText("Structure Name", m_MemoryDumpNewStructureBuffer, 20);
+		ImGui::SameLine();
+		if (stylewrappers::Button("Add Structure", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
+		{
+			auto struct_name = std::string(m_MemoryDumpNewStructureBuffer);
+			m_MemoryDumpStructureVec.push_back(MemDumpStructure(struct_name));
+		}
+		ImGui::SameLine();
+		if (stylewrappers::Button("Done", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
+		{
+			m_bMemoryDumpShowAddStructurePopup = false;
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+
+}
+
+void Manager::HandleMemoryDumpMemberEditPopup()
+{
+	int& selected_struct_index = m_MemoryDumpNewStructure_CurrentlySelected;
+	int& selected_member = m_MemoryDumpNewStructure_MemberSelected.first;
+	int& selected_field = m_MemoryDumpNewStructure_MemberSelected.second;
+	if (selected_struct_index >= m_MemoryDumpStructureVec.size())
+		return;
+	auto& selected_struct = m_MemoryDumpStructureVec[selected_struct_index];
+	auto& selected_item = selected_struct.GetSelectedEntry(selected_member);
+
+
+	if (m_bMemoryDumpShowMemberEditPopup)
+	{
+		ImGui::OpenPopup("Member Edit");
+	}
+
+	if (ImGui::BeginPopup("Member Edit"))
+	{
+		
+		int selected_DisplayType;
+		int input_size;
+		ImGui::Text("Field: %s\tDisplayType: %s\t Size: %ld", selected_item.m_GivenName.c_str(), DumpDisplayType2String(selected_item.m_Display).c_str(), selected_item.m_Size);
+		switch (selected_field)
+		{
+			case 0:
+			{
+				ImGui::InputText("Field", m_MemoryDumpMemberEditBuffer, 20);
+				break;
+			}
+			case 1:
+			{
+				const char* items[] = { "INT","LONG_INT","UNSIGNED_INT","UNSIGNED_LONGLONG","ASCII","UNICODE","HEX", };
+				for (int i = 0; i < 7; i++)
+				{
+					if (ImGui::Selectable(items[i]))
+					{
+						m_MemoryDumpMemberEditDisplaySelector = (MEMDUMPDISPLAY)i; 
+					}
+				}
+				break;
+			}
+			case 2:
+			{
+				ImGui::InputInt("Size", &m_MemoryDumpMemberEditSizeSelector);
+				break;
+			}
+			default:
+				break;
+		}
+
+		if (stylewrappers::Button("Apply Changes", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
+		{
+			switch (selected_field)
+			{
+			case 0:
+			{
+				selected_struct.EditFieldEntry(selected_member, std::string(m_MemoryDumpMemberEditBuffer));
+				break;
+			}
+			case 1:
+			{
+				selected_struct.EditDisplayEntry(selected_member, m_MemoryDumpMemberEditDisplaySelector);
+				break;
+			}
+			case 2:
+			{
+				selected_struct.EditSizeEntry(selected_member, m_MemoryDumpMemberEditSizeSelector);
+				break;
+			}
+			default:
+				break;
+			}
+
+			memset(m_MemoryDumpMemberEditBuffer, 0x00, 20);
+		}
+		ImGui::SameLine();
+		if (stylewrappers::Button("Done", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
+		{
+			m_bMemoryDumpShowMemberEditPopup = false;
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+
+}
+	
+
+
+
+	
+
 
 
 
@@ -157,7 +473,7 @@ void Manager::HandleSettingsPopup()
 	{
 		ImGui::SetNextWindowPos(ImVec2(200, 200), ImGuiCond_Always);
 		ImGui::SetNextWindowSize(ImVec2(800, 500)); // Set the desired size
-		ImGui::Begin("Custom Popup", &m_bSettingsShowPopup);
+		ImGui::Begin("Settings", &m_bSettingsShowPopup);
 		HandleSettingsDisplay();
 		
 
@@ -307,15 +623,6 @@ void Manager::DisplayFileNavigator()
 				m_FileBrowser->SetInputPath(c_str);
 				auto fb_retcode = m_FileBrowser->LoadFile(str);
 				m_Decoder->DecodeBytes(m_FileBrowser->m_FileLoadData);
-
-
-				auto memdump = new MemDump({ {2, MEMDUMPDISPLAY::ASCII}, { 2, MEMDUMPDISPLAY::HEX }, { 2, MEMDUMPDISPLAY::HEX } });
-				auto dd = memdump->GetDisplayData(m_FileBrowser->m_FileLoadData, 0);
-				for (auto& x : dd)
-				{
-					std::cout << x.m_Display << "\t[SIZE: " << x.m_Size << "]" << std::endl;
-				}
-
 
 				if (fb_retcode == FB_RETCODE::FILE_CHANGE_LOAD)
 				{

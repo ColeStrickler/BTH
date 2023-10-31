@@ -13,10 +13,12 @@
 #include "..\db\db.h"
 #include "imgui_stylewrappers.h"
 #include "..\memdump\memdump.h"
+#include "..\db\defaultstructs.h"
 #include <mutex>
 #include <iostream>
 #define MAX_SCANNER_DISPLAY 25
-
+#define WINDOW_WIDTH 1600
+#define WINDOW_HEIGHT 1000
 
 
 static ImVec4 RedFont = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
@@ -62,11 +64,13 @@ public:
 
 
 	// Memory Dump Functions
+	void InitDefaultStructs();
 	void HandleMemoryDump();
 	void HandleMemoryDumpButton();
-	void HandleMemoryDumpCommandLine();
+	void HandleMemoryDumpStructureView();
 	void HandleMemoryDumpStructureEditor();
-
+	void HandleMemoryDumpNewStructurePopup();
+	void HandleMemoryDumpMemberEditPopup();
 
 
 	// DB|SAVED SETTINGS FUNCTIONS
@@ -156,9 +160,23 @@ private:
 
 
 
+	/*
+		MEMORY DUMP
+	*/
+	std::vector<MemDumpStructure> m_MemoryDumpStructureVec;
+	bool m_bMemoryDumpShowAddStructurePopup;
+	char m_MemoryDumpNewStructureBuffer[20];
+	char m_MemoryDumpMemberEditBuffer[20];
+	MEMDUMPDISPLAY m_MemoryDumpMemberEditDisplaySelector;
+	int m_MemoryDumpMemberEditSizeSelector;
 
 
+	int m_MemoryDumpNewStructure_CurrentlySelected;
+	std::pair<int, int> m_MemoryDumpNewStructure_MemberSelected;
+	bool m_bMemoryDumpShowMemberEditPopup;
 
+
+	//std::unordered_map<std::string, std::vector<MemDumpDisplayEntry>> m_StructureMap;
 
 
 	/*

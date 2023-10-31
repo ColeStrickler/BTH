@@ -4,6 +4,10 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include "defaultstructs.h"
+#include <format>
+
+
 #define BTH_DBSTRING ".\\bth.db"
 
 
@@ -111,7 +115,11 @@ static const std::vector<std::string> COLORSETTINGS_QUERYSTRING = {
 	"'PEPARSER_COLHEADERTEXT_COLOR'",
 };
 
-
+struct saved_struct
+{
+	std::string m_Name;
+	int m_MemberCount;
+};
 
 
 class db_mgr
@@ -129,7 +137,7 @@ public:
 	void UpdateDataItem(const std::string& table, const std::string& selection_attribute, const std::string& selection_criteria,
 						const std::string& update_attribute, const std::string& update_value);
 	void UpdateColorSetting(const std::string& name, const ImVec4& Color);
-
+	void SaveStructure(const MemDumpStructure& structure);
 
 
 	
@@ -138,9 +146,10 @@ public:
 	int RetrieveInt(const std::string& table, const std::string& selection_attribute, const std::string& selection_criteria, int data_column);
 	std::string RetrieveString(const std::string& table, const std::string& selection_attribute, const std::string& selection_criteria, int data_column);
 	ImVec4 GetColorSetting(VISUALS_INDEX index) const { return m_SavedSettings->GetColorSettings(index); };
+	std::vector<saved_struct> RetrieveSavedStructures();
+	MemDumpStructEntry RetrieveStructMember(const std::string& parent_structure, const std::string& member_index);
 
-
-	
+	std::vector<default_struct> m_DefaultStructs;
 
 private:
 	void LoadState();

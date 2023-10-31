@@ -6,8 +6,7 @@
 #include "manager/manager.h"
 #include "utils/utils.h"
 
-#define WINDOW_WIDTH 1600
-#define WINDOW_HEIGHT 1000
+
 
 bool GLLogCall(const char* func, const char* file, int line)
 {

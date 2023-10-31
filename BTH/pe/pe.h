@@ -86,7 +86,7 @@ public:
 	void ParseSectionHeaders32(PIMAGE_DOS_HEADER dos);
 	void ParseSectionHeaders64(PIMAGE_DOS_HEADER dos);
 
-
+	
 	/*
 		We currently are not supporting ordinal imports, we will add this soon
 	*/
