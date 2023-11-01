@@ -1,4 +1,6 @@
-### Pre-Release is out now
+# The File RE Tool for hackers
+
+## Pre-release is out now!
 
 ## Features
 - String Scanner
