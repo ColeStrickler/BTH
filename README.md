@@ -19,7 +19,7 @@
 ![colorsettings](https://github.com/ColeStrickler/BTH/assets/82488869/3f51fc05-570a-4528-a885-f99b3be47ef1)
 
 
-### Structure overlay with support for saveable custom structures
+### Structure overlay with support for saveable custom structures - Ideal for memory dump parsing
 ![structureOverlay](https://github.com/ColeStrickler/BTH/assets/82488869/14b41b93-0ff6-49c6-bc8b-c850b4c8dc06)
 
 
