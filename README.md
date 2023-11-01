@@ -8,7 +8,7 @@
 - Memory Dump Parser/Structure Overlay
 - Support For Custom Structures
 - Complete Color Customization Control
-- 
+  
 NOTES:
 3rd column in HexDump View is blank because Python3 Scripting engine will go here in future release
 
