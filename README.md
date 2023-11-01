@@ -1,4 +1,4 @@
-# The File RE Tool for hackers
+# The File and Memory Dump RE Tool for hackers
 
 ## Pre-release is out now!
 
