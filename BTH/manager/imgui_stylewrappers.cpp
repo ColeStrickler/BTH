@@ -57,6 +57,15 @@ bool stylewrappers::ColoredSelectable(const std::string& SelectableText, const I
 	return ret;
 }
 
+void stylewrappers::ColoredInputText(const ImVec4& Color, const std::string& Label, char* Buffer, size_t BufferSize, ImGuiInputTextFlags Flags)
+{
+	ImGuiStyle& style = ImGui::GetStyle();
+	auto original_text_style = style.Colors[ImGuiCol_Text];
+	style.Colors[ImGuiCol_Text] = Color;
+	ImGui::InputText(Label.c_str(), Buffer, BufferSize, Flags);
+	style.Colors[ImGuiCol_Text] = original_text_style;
+}
+
 
 
 stylewrappers::TableStyle::TableStyle(const ImVec4& ColHeaderBgColor, const ImVec4& ColHeaderTextColor)

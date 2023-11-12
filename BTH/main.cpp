@@ -56,7 +56,7 @@ int main()
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 
 
-	window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Hello Window !", nullptr, nullptr);
+	window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "BTH", nullptr, nullptr);
 	if (!window)
 	{
 		glfwTerminate();
@@ -96,16 +96,10 @@ int main()
 	while (!glfwWindowShouldClose(window))
 	{
 		GLCall(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
-
 		ui.Start();
 		ui.DrawUI();
 		ui.End();
-
-
-
 		glfwSwapBuffers(window);
-
-		/* Poll for and process events */
 		glfwPollEvents();
 	}
 

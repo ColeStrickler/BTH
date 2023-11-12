@@ -47,7 +47,7 @@ void Manager::RenderUI()
 {
 	if (!m_bShowMemoryDumpView)
 	{
-		ImGui::Columns(2, "global_cols", true);
+		ImGui::Columns(3, "global_cols", true);
 	}
 	else
 	{
@@ -96,12 +96,11 @@ void Manager::RenderUI()
 	/*
 		COLUMN 3
 
-		[!] We only have 3 columns in memory dump view
 	*/
-
+	ImGui::NextColumn();
 	if (m_bShowMemoryDumpView)
 	{
-		ImGui::NextColumn();
+		
 		HandleMemoryDumpStructureEditor();
 	}
 
@@ -111,6 +110,8 @@ void Manager::RenderUI()
 	
 	
 
+	// Other Maintenance
+	BackgroundColorSettings();
 
 
 }
@@ -131,6 +132,12 @@ void Manager::BeginThreadManagerThread()
 			m_ActiveThreads.clear();
 		}
 	}
+}
+
+void Manager::BackgroundColorSettings()
+{
+	ImGuiStyle& style = ImGui::GetStyle();
+	style.Colors[ImGuiCol_WindowBg] = m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BACKGROUND_COLOR);
 }
 
 
@@ -749,14 +756,12 @@ void Manager::HandleHexdumpPopups()
 
 void Manager::HandleHexdumpButtons()
 {
-	
-
 	/*
 		Here we grab the input for the offset editor, convert it to hex, and check if it is different than the current offset.
 		If it is, then we call LoadFile to see if we need to load a different portion of the file
 	*/
 	ImGui::SetNextItemWidth(200.0f);
-	ImGui::InputText("Offset", m_OffsetEditorBuffer, sizeof(m_OffsetEditorBuffer), ImGuiInputTextFlags_CharsHexadecimal);
+	stylewrappers::ColoredInputText(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Offset", m_OffsetEditorBuffer, sizeof(m_OffsetEditorBuffer), ImGuiInputTextFlags_CharsHexadecimal);
 	std::string offset(m_OffsetEditorBuffer);
 	int new_offset = utils::stringToHex(offset);
 
@@ -827,7 +832,7 @@ void Manager::HandleDecoder()
 	buttonSize.y = ImGui::CalcTextSize("Select File").y + ImGui::GetStyle().FramePadding.y * 2;
 
 	ImGui::Dummy(buttonSize); // Add 10 units of padding
-	ImGui::BeginChild("DisassemblyRegion", ImVec2(m_DecoderWidth, m_DecoderHeight), true);
+	ImGui::BeginChild("DisassemblyRegion", ImVec2(WINDOW_WIDTH/3 - 17, WINDOW_HEIGHT/2 - 75), true);
 
 	auto offset = m_Decoder->m_OffsetToInstIndex[m_GlobalOffset];
 

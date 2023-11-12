@@ -15,6 +15,7 @@ namespace stylewrappers
 
 	bool ColoredSelectable(const std::string& SelectableText, const ImVec4& Color);
 
+	void ColoredInputText(const ImVec4& Color, const std::string& Label, char* Buffer, size_t BufferSize, ImGuiInputTextFlags Flags);
 
 
 	class TableStyle

@@ -61,6 +61,7 @@ public:
 	// Manager Functions
 	void RenderUI();
 	void BeginThreadManagerThread();
+	void BackgroundColorSettings();
 
 
 	// Memory Dump Functions
