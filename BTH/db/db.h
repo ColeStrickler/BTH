@@ -138,6 +138,7 @@ public:
 						const std::string& update_attribute, const std::string& update_value);
 	void UpdateColorSetting(const std::string& name, const ImVec4& Color);
 	void SaveStructure(const MemDumpStructure& structure);
+	void DeleteStructure(const MemDumpStructure& structure);
 
 
 	

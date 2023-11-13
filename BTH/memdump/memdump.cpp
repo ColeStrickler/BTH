@@ -94,7 +94,32 @@ size_t DumpDisplaySize(MEMDUMPDISPLAY type)
 }
 
 
+static std::string BoolDataToString(std::vector<unsigned char>& bytes, size_t offset, MemDumpStructEntry& se)
+{
+	std::string ret;
+	if (se.m_Size == sizeof(bool))
+	{
+		unsigned char* data = (bytes.data() + offset);
+		ret = std::to_string(*data && 0x1);
+		return ret;
+	}
+	else
+	{
+		// protect from over indexing vector
+		if (offset + se.m_Size > bytes.size())
+			return "OVERFLOW";
+		auto array_entries = se.m_Size / sizeof(bool);
+		for (int i = 0; i < array_entries; i++)
+		{
+			unsigned char* data = (bytes.data() + offset);
+			ret += ucharToHexString(*data && 0x1);
+			ret += " ";
+			offset += sizeof(bool);
 
+		}
+		return ret;
+	}
+}
 
 
 
@@ -198,7 +223,7 @@ static std::string GetDisplayString(std::vector<unsigned char>& bytes, size_t of
 		}
 		case MEMDUMPDISPLAY::BOOL:
 		{
-			return DataToString<bool>(bytes, offset, se);
+			return BoolDataToString(bytes, offset, se);
 		}
 		default:
 			return "";

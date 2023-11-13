@@ -221,6 +221,35 @@ PYBIND11_EMBEDDED_MODULE(mgr, m) {
 	});
 
 
+	/*
+		mgr.SaveStructure(int struct_id)
+	 
+		Saves the structure identified by struct_id to the database for use in later sessions
+	*/
+	m.def("SaveStructure", [](int struct_id) {
+		manager.SaveStructure(struct_id);
+		return;
+	});
+
+
+	/*
+		mgr.DeleteStructure(int struct_id)
+
+		Deletes the structure identified by struct_id and all of its member variables from the database
+	*/
+	m.def("DeleteStructure", [](int struct_id) {
+		manager.DeleteStructure(struct_id);
+		return;
+	});
+
+
+	/*
+		mgr.StringScan(int min_string_length) 
+	
+		This function scans for all strings in the currently loaded file
+
+		It returns all strings found with min_string_length, both ASCII and Unicode, in a list
+	*/
 	m.def("StringScan", [](int min_string_length) {
 		auto fb = manager.m_FileBrowser;
 		auto scanner = manager.m_ByteScanner;
@@ -243,6 +272,29 @@ PYBIND11_EMBEDDED_MODULE(mgr, m) {
 		return python_strings;
 	});
 
+	/*
+		mgr.ByteScan(const std::vector<std::string>& bytes)
+
+		Call this function in python like so:
+		mgr.ByteScan(['4d', '5a','ff', '41'])
+
+		We return a list of addresses as size_t of where the matches of this pattern occurred
+
+	*/
+	m.def("ByteScan", [](const std::vector<std::string>& bytes) {
+		std::vector<size_t> ret;	// return the addresses of hits
+		if (bytes.size() > 16)		// We accept 16 as the max size of the byte pattern
+			return ret;
+
+		std::vector<unsigned char> byte_vector;					
+		for (auto& b : bytes)
+		{
+			if (b.size() > 2)		// do not accept bytes that arent of the form "ff" or "4d"
+				return ret;
+			byte_vector.push_back(static_cast<unsigned char>(utils::stringToHex(b)));
+		}
+		return manager.RequestByteScan(byte_vector);
+	});
 
 }
 
@@ -289,15 +341,6 @@ int main()
 	style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.9f, 0.9f, 0.9f, 1.0f); // Button background color when hovered
 	style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.8f, 0.8f, 0.8f, 1.0f); // Button background color when active
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f)); // Set text color to black for buttons
-
-
-
-
-
-
-
-
-
 
 	ui.AddComponentLeft("RenderLeft", RenderRight, &manager);
 

@@ -153,7 +153,9 @@ public:
 	inline int NewStructure(const std::string& struct_name) { m_MemoryDumpStructureVec.push_back(MemDumpStructure(struct_name)); return m_MemoryDumpStructureVec.size() - 1; };
 	int GetStructureId(const std::string& struct_name) const;
 	int AddStructMember(int struct_id, std::string member_name, int size, int display_type);
-	
+	void SaveStructure(int struct_id) const;
+	void DeleteStructure(int struct_id);
+	std::vector<size_t> RequestByteScan(std::vector<unsigned char>& bytes);
 
 	
 
@@ -295,6 +297,7 @@ private:
 #include "../Dependencies/python/include/Python.h"
 #include "../Dependencies/python/pybind11/pybind11.h"
 #include "../Dependencies/python/pybind11/embed.h"
+#include "../Dependencies/python/pybind11/stl.h"
 
 // This 
 

@@ -54,8 +54,13 @@ static std::string FormatUpdateQuery(const std::string& table, const std::string
 	return update_query;
 }
 
-
-
+static std::string FormatDeletionQuery(const std::string& table, const std::string& sel_col1, const std::string& sel_val1, const std::string& sel_col2, \
+	const std::string& sel_val2)
+{
+	std::string DeletionQuery = std::format("DELETE FROM {} WHERE {} = '{}' AND {} = '{}';", \
+		table, sel_col1, sel_val1, sel_col2, sel_val2);
+	return DeletionQuery;
+}
 
 
 
@@ -254,10 +259,14 @@ void db_mgr::UpdateColorSetting(const std::string& name, const ImVec4& Color)
 	UpdateDataItem("ColorSettings", "name", name, "B", B_VAL);
 	UpdateDataItem("ColorSettings", "name", name, "A", A_VAL);
 
-	// Reload State
+	// Reload State because we get our color values directly from calling a function of this class
+	// so it is essential that we reload state so that it reflects the new value
 	LoadState();
 }
 
+/*
+	This function saves a structure's metadata(the structure itself and all of its members) to the database
+*/
 void db_mgr::SaveStructure(const MemDumpStructure& structure)
 {
 	int err;
@@ -292,6 +301,35 @@ void db_mgr::SaveStructure(const MemDumpStructure& structure)
 		}
 	}
 	return;;
+}
+
+/*
+	This function deletes a structure and all of its members from the database
+*/
+void db_mgr::DeleteStructure(const MemDumpStructure& structure)
+{
+	int err;
+	auto members = structure.GetAllEntries();
+	auto num_entries = members.size();
+	std::string DELETE_STRUCT_QUERY = FormatDeletionQuery("Structures", "name", structure.m_Name, "member_count", std::to_string(num_entries));
+	if ((err = sqlite3_exec(m_DB, DELETE_STRUCT_QUERY.c_str(), 0, 0, 0)) != SQLITE_OK)
+	{
+		printf("error on deletion struct query!\n");
+		m_ErrorCode = err;
+		return;
+	}
+
+	for (auto& m : members)
+	{
+		std::string DELETE_MEMBER_QUERY = FormatDeletionQuery("StructureMembers", "parent_structure_name", structure.m_Name, "member_name", m.m_GivenName);
+		if ((err = sqlite3_exec(m_DB, DELETE_STRUCT_QUERY.c_str(), 0, 0, 0)) != SQLITE_OK)
+		{
+			printf("error on deletion struct query!\n");
+			m_ErrorCode = err;
+			return;
+		}
+	}
+	return;
 }
 
 

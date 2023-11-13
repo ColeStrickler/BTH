@@ -363,7 +363,7 @@ void Manager::HandleMemoryDumpStructureEditor()
 			m_MemoryDumpStructureVec[m_MemoryDumpNewStructure_CurrentlySelected].RemoveEntry();
 	}
 	ImGui::SameLine();
-	if (stylewrappers::Button("Save Structure", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	if (stylewrappers::Button("Save Struct", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 	{
 		if (m_MemoryDumpNewStructure_CurrentlySelected < m_MemoryDumpStructureVec.size())
 		{
@@ -371,6 +371,19 @@ void Manager::HandleMemoryDumpStructureEditor()
 			m_DataBaseManager->SaveStructure(structure);
 		}
 	}
+	
+	if (stylewrappers::Button("Delete Struct", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	{
+		if (m_MemoryDumpNewStructure_CurrentlySelected < m_MemoryDumpStructureVec.size())
+		{
+			auto& structure = m_MemoryDumpStructureVec[m_MemoryDumpNewStructure_CurrentlySelected];
+			// delete the structure member from the Manager class vector by its index
+			m_DataBaseManager->DeleteStructure(structure);
+			m_MemoryDumpStructureVec.erase(m_MemoryDumpStructureVec.begin() + m_MemoryDumpNewStructure_CurrentlySelected);
+			
+		}
+	}
+
 
 }
 
@@ -1556,6 +1569,29 @@ int Manager::AddStructMember(int struct_id, std::string member_name, int size, i
 	{
 		return -1;
 	}
+}
+
+void Manager::SaveStructure(int struct_id) const
+{
+	auto& structure = m_MemoryDumpStructureVec[struct_id];
+	m_DataBaseManager->SaveStructure(structure);
+}
+
+void Manager::DeleteStructure(int struct_id)
+{
+	auto& structure = m_MemoryDumpStructureVec[struct_id];
+	m_DataBaseManager->DeleteStructure(structure);
+	m_MemoryDumpStructureVec.erase(m_MemoryDumpStructureVec.begin() + struct_id);
+}
+
+std::vector<size_t> Manager::RequestByteScan(std::vector<unsigned char>& bytes)
+{
+	memset(m_ByteScannerPatternBuffer, 0x00, 17);						// clear the buffer before copying
+	for (int i = 0; i < bytes.size(); i++)
+	{
+		memcpy(&m_ByteScannerPatternBuffer[i], &bytes[i], 1);			// We copy the pattern from the script into the pattern buffer to avoid confusion/discrepancies
+	}
+	return m_ByteScanner->byte_scan_file(m_FileBrowser, bytes, this);	// return the matches
 }
 
 
