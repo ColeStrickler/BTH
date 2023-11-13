@@ -66,6 +66,24 @@ void stylewrappers::ColoredInputText(const ImVec4& Color, const std::string& Lab
 	style.Colors[ImGuiCol_Text] = original_text_style;
 }
 
+void stylewrappers::MultilineText(const ImVec4& BgColor, const ImVec4& TextColor, char* Buffer, size_t BufferSize, ImVec2 WindowSize)
+{
+
+	ImGuiStyle& style = ImGui::GetStyle();
+	auto original_text_style = style.Colors[ImGuiCol_Text];
+	auto original_bg_style = style.Colors[ImGuiCol_FrameBg];
+	style.Colors[ImGuiCol_Text]		= TextColor;
+	style.Colors[ImGuiCol_FrameBg] = BgColor;
+	// We get weird ImGui assertion errors if we do not do the +1 here
+	// The typing is also weird and only shows the second to last character typed without the +1
+	ImGui::InputTextMultiline("##editor", Buffer+1, BufferSize-1, WindowSize, \
+		ImGuiInputTextFlags_AllowTabInput, NULL, NULL);
+
+	style.Colors[ImGuiCol_Text] = original_text_style;
+	style.Colors[ImGuiCol_FrameBg] = original_bg_style;
+
+}
+
 
 
 stylewrappers::TableStyle::TableStyle(const ImVec4& ColHeaderBgColor, const ImVec4& ColHeaderTextColor)

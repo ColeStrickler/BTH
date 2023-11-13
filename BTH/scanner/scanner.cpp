@@ -213,6 +213,8 @@ StringMatches Scanner::string_scan_file(FileBrowser* fb, Manager* mgr, int min_s
 
 StringMatches Scanner::string_scan(const std::vector<unsigned char>& bytes, StringMatches& out, size_t offset, int min_string_length)
 {
+	m_StringMatches.m_StandardStrings.clear();
+	m_StringMatches.m_UnicodeStrings.clear();
 	char asciiLowBound = '!';
 	char asciiHighBound = '~';
 

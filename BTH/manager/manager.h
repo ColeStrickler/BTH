@@ -16,6 +16,8 @@
 #include "..\db\defaultstructs.h"
 #include <mutex>
 #include <iostream>
+
+
 #define MAX_SCANNER_DISPLAY 25
 #define WINDOW_WIDTH 1600
 #define WINDOW_HEIGHT 1000
@@ -46,6 +48,8 @@ enum class SETTINGS_DISPLAY : short
 	PERFORMANCE
 };
 
+// We forward declare this class so it can be used within Manager
+class interpreter;
 
 
 /*
@@ -131,13 +135,29 @@ public:
 	void HandleOptionalHeader();
 	void HandleDataDirectories();
 	void HandleSectionHeaders();
-
 	void HandleImports();
+
+
+
+	/*
+		Python Intepreter Display Functions
+	*/
+
+
+
+	/*
+		Python Function Bindings
+	*/
+	inline void SetGlobalOffset(const std::string& offset) { memset(m_OffsetEditorBuffer, 0x00, 9); memcpy(m_OffsetEditorBuffer, offset.c_str(), offset.size()); };
+	inline size_t GetGlobalOffset() const { return m_GlobalOffset; };
+	inline int NewStructure(const std::string& struct_name) { m_MemoryDumpStructureVec.push_back(MemDumpStructure(struct_name)); return m_MemoryDumpStructureVec.size() - 1; };
+	int GetStructureId(const std::string& struct_name) const;
+	int AddStructMember(int struct_id, std::string member_name, int size, int display_type);
 	
 
 	
 
-
+	interpreter* m_PythonInterpreter;
 	FileBrowser* m_FileBrowser;
 	Decoder* m_Decoder;
 	Scanner* m_ByteScanner;
@@ -162,7 +182,7 @@ private:
 
 
 	/*
-		MEMORY DUMP
+		MEMORY DUMP/STRUCTURE OVERLAY
 	*/
 	std::vector<MemDumpStructure> m_MemoryDumpStructureVec;
 	bool m_bMemoryDumpShowAddStructurePopup;
@@ -250,7 +270,47 @@ private:
 	int m_PEselectedImportView;
 
 	
+	/*
+		PYTHON INTERPRETER
+	*/
 
+
+
+	
+
+
+
+};
+
+
+
+
+/*
+	BEGIN INTERPRETER CLASS
+
+	We create the Interpreter class implementation here becasuse
+	it will reference the Manager class and vice versa, so to avoid
+	circular imports we just create our implementation here
+*/
+#include "../Dependencies/python/include/Python.h"
+#include "../Dependencies/python/pybind11/pybind11.h"
+#include "../Dependencies/python/pybind11/embed.h"
+
+// This 
+
+
+class interpreter
+{
+public:
+	interpreter(Manager* mgr);
+	~interpreter();
+
+	void exec();
+
+	size_t m_ScriptBufferSize;
+	char* m_ScriptBuffer;
+
+private:
 
 
 };

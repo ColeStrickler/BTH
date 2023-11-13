@@ -27,6 +27,7 @@ Manager::Manager() : m_HexDumpWidth(475), m_HexDumpHeight(400), m_DecoderWidth(4
 	m_Decoder = new Decoder();
 	m_ByteScanner = new Scanner();
 	m_DataBaseManager = new db_mgr();
+	m_PythonInterpreter = new interpreter(this);
 	auto t = std::thread(&Manager::BeginThreadManagerThread, this);
 	m_ThreadManagerThread = std::move(t);
 	InitDefaultStructs();
@@ -103,6 +104,24 @@ void Manager::RenderUI()
 		
 		HandleMemoryDumpStructureEditor();
 	}
+	else
+	{
+
+		/*
+			LETS THREAD OUT THE EXEC() FUNCTION EVENTUALLY, THIS WILL LET LONG RUNNING SCRIPTS RUN IN THE BACKGROUND
+			WHILE THE APP IS ALLOWED TO STILL BE USEABLE
+		*/
+		ImGui::Dummy(ImVec2(100, 20));	// Same size as navigator buttons
+		// WE WILL NEED TO ADD CUSTOM COLOR SETTINGS FOR THIS
+		stylewrappers::MultilineText(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::HEXDUMP_BACKGROUND_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), \
+			m_PythonInterpreter->m_ScriptBuffer, 8192, ImVec2(WINDOW_WIDTH / 3, WINDOW_HEIGHT / 2 - 100));
+
+		if (stylewrappers::Button("exec", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
+		{
+			m_PythonInterpreter->exec();
+		}
+
+	}
 
 
 	ImGui::Columns(1);
@@ -110,7 +129,7 @@ void Manager::RenderUI()
 	
 	
 
-	// Other Maintenance
+	// Do Other Maintenance
 	BackgroundColorSettings();
 
 
@@ -134,6 +153,11 @@ void Manager::BeginThreadManagerThread()
 	}
 }
 
+
+/*
+	Since we do not set the background setting in any other functions in our render loop,
+	we give it its own function here
+*/
 void Manager::BackgroundColorSettings()
 {
 	ImGuiStyle& style = ImGui::GetStyle();
@@ -141,7 +165,10 @@ void Manager::BackgroundColorSettings()
 }
 
 
-
+/*
+	This function will grab all the structs saved in the database
+	and add them to our Manager class for rendering
+*/
 void Manager::InitDefaultStructs()
 {
 	// load default structures into our structure vector
@@ -163,7 +190,9 @@ void Manager::HandleMemoryDump()
 }
 
 
-
+/*
+	This function handles the button that toggles between memory dump view and disassembler view
+*/
 void Manager::HandleMemoryDumpButton()
 {
 	std::string display = (m_bShowMemoryDumpView ? "HexDump" : "MemoryDump");
@@ -175,6 +204,10 @@ void Manager::HandleMemoryDumpButton()
 	}
 }
 
+
+/*
+	This function handles rendering the structure overlay table in memory dump view
+*/
 void Manager::HandleMemoryDumpStructureView()
 {
 	// need to fix this offset
@@ -219,6 +252,10 @@ void Manager::HandleMemoryDumpStructureView()
 
 }
 
+
+/*
+	This function renders the structure editor table in memory dump view
+*/
 void Manager::HandleMemoryDumpStructureEditor()
 {
 	if (ImGui::BeginChild("StructureEdit", ImVec2(WINDOW_WIDTH/3, WINDOW_HEIGHT/2 - 50)))
@@ -337,6 +374,11 @@ void Manager::HandleMemoryDumpStructureEditor()
 
 }
 
+/*
+	This function handles the popup for the "New Structure" button
+
+	The actually adding of the new struct to m_MemoryDumpStructureVec is done here as well
+*/
 void Manager::HandleMemoryDumpNewStructurePopup()
 {
 
@@ -1486,3 +1528,80 @@ void Manager::HandleImports()
 	ImGui::EndChild();
 }
 
+int Manager::GetStructureId(const std::string& struct_name) const
+{
+	int i = 0;
+	for (auto& st : m_MemoryDumpStructureVec)
+	{
+		if (st.m_Name == struct_name)
+			return i;
+		i++;
+	}
+	return -1;
+}
+
+int Manager::AddStructMember(int struct_id, std::string member_name, int size, int display_type)
+{
+	if (struct_id >= 0 && struct_id < m_MemoryDumpStructureVec.size())
+	{
+		auto& selected_struct = m_MemoryDumpStructureVec[struct_id];
+		MemDumpStructEntry se;
+		se.m_GivenName = member_name;
+		se.m_Size = size;
+		se.m_Display = (MEMDUMPDISPLAY)display_type;
+		selected_struct.AddEntry(se);
+		return 0;
+	}
+	else
+	{
+		return -1;
+	}
+}
+
+
+
+
+
+
+
+
+
+
+static std::string format_func(const std::string& format)
+{
+	std::string ret = std::format("\n{}\n", format);
+
+	return ret;
+}
+
+
+interpreter::interpreter(Manager* mgr)
+{
+	m_ScriptBuffer = new char[8192]{ 0 };
+	m_ScriptBufferSize = 8192;
+}
+
+interpreter::~interpreter()
+{
+	delete m_ScriptBuffer;
+}
+
+
+
+
+void interpreter::exec()
+{
+	// Interpreter was initialized in global main()
+
+
+	try
+	{
+		pybind11::exec(format_func(m_ScriptBuffer+1).c_str());
+	}
+	catch (const pybind11::error_already_set& e)
+	{
+		PyErr_Print(); // Print the Python error traceback
+		std::cerr << "Caught a Python error: " << e.what() << std::endl;
+	}
+
+}

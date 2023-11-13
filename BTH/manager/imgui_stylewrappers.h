@@ -17,6 +17,8 @@ namespace stylewrappers
 
 	void ColoredInputText(const ImVec4& Color, const std::string& Label, char* Buffer, size_t BufferSize, ImGuiInputTextFlags Flags);
 
+	void MultilineText(const ImVec4& BgColor, const ImVec4& TextColor, char* Buffer, size_t BufferSize, ImVec2 WindowSize);
+
 
 	class TableStyle
 	{
