@@ -19,7 +19,7 @@ bool GLLogCall(const char* func, const char* file, int line)
 	return true;
 
 }
-;
+
 void GLClearError()
 {
 	while (glGetError() != GL_NO_ERROR) {};
@@ -91,6 +91,17 @@ PYBIND11_EMBEDDED_MODULE(mgr, m) {
 		return manager.m_FileBrowser->m_FileLoadData.size();
 	});
 
+
+	/*
+		mgr.GetFileSize()
+
+		Returns the size of the entire file
+	*/
+	m.def("GetFileSize", []() {
+		return manager.m_FileBrowser->m_LoadedFileSize;
+	});
+
+
 	/*
 		mgr.GetByte(int offset) 
 
@@ -101,7 +112,22 @@ PYBIND11_EMBEDDED_MODULE(mgr, m) {
 			return std::string("");
 		return ucharToHexString(manager.m_FileBrowser->m_FileLoadData[offset]);
 	});
+
+	/*
+		mgr.SetByte(int offset, int val)
+
+		Pass in an offset from the current load location and attempt to set the byte equal to val
+	*/
+	m.def("SetByte", [](int offset, std::string val) {
+		unsigned char byte_val = static_cast<unsigned char>(utils::stringToHex(val));
+		if (offset < 0 || offset > manager.m_FileBrowser->m_FileLoadData.size() || byte_val > 0xff || byte_val < 0)
+			return -1;
+
+		manager.m_FileBrowser->EditByte(offset, byte_val);
+		return 0;
+	});
 	
+
 
 	/*
 		mgr.GetFileLoadOffset()
@@ -166,6 +192,24 @@ PYBIND11_EMBEDDED_MODULE(mgr, m) {
 			return -1;
 		}
 	});
+
+	/*
+		mgr.SaveFile(std::string path)
+
+
+		This function will attempt to save the currently loaded file and all of its edits to the input 
+		Return Values:
+		1. If the file was unable to be saved, -1 is returned
+		2. On a successful save, 0 is returned
+	*/
+	m.def("SaveFile", [](std::string path) {
+
+		return !manager.SaveFile(path) - 1;
+	});
+
+
+
+
 
 	/*
 		mgr.NewStructure(std::string name)
@@ -342,6 +386,7 @@ int main()
 	style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.8f, 0.8f, 0.8f, 1.0f); // Button background color when active
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f)); // Set text color to black for buttons
 
+	// add our management loop into the UI render loop 
 	ui.AddComponentLeft("RenderLeft", RenderRight, &manager);
 
 

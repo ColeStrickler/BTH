@@ -5,6 +5,7 @@
 #include <fstream>
 #include <algorithm>
 #include <iostream>
+#include <map>
 #include "../utils/utils.h"
 
 
@@ -16,6 +17,13 @@ enum class FB_RETCODE : short
 	OFFSET_CHANGE_LOAD,
 	FILE_CHANGE_LOAD,
 	FILE_ERROR_LOAD
+};
+
+
+struct FileEdit
+{
+	unsigned char m_ByteValue;	// Value of the edit
+	int m_Offset;				// offset into that cohort of bytes
 };
 
 
@@ -35,6 +43,12 @@ public:
 	std::vector<unsigned char> LoadBytes(unsigned long long offset, DWORD numToRead, DWORD* numRead);
 	void SetInputPath(const std::string& new_inputpath);
 	void DisplayCurrentDirectory();
+	
+	void EditByte(int offset, unsigned char edit_value); // offset is from current load position
+	bool SaveFile(const std::string& save_path);
+
+	int PushByte(unsigned char byte);
+
 
 
 	/*
@@ -44,7 +58,8 @@ public:
 	
 	*/
 
-
+	
+	std::map<int, std::vector<FileEdit>> m_Edits; // key marks which cohort of bytes edit took place in, 0-200k = 0, 200-400k = 1, and so on
 	std::vector<fs::directory_entry> m_CurrentDirectory;
 	std::vector<std::string> m_CurrentDirectoryListings;
 	std::vector<unsigned char> m_FileLoadData;

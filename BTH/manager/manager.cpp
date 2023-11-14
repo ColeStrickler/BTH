@@ -116,7 +116,7 @@ void Manager::RenderUI()
 		stylewrappers::MultilineText(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::HEXDUMP_BACKGROUND_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), \
 			m_PythonInterpreter->m_ScriptBuffer, 8192, ImVec2(WINDOW_WIDTH / 3, WINDOW_HEIGHT / 2 - 100));
 
-		if (stylewrappers::Button("exec", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
+		if (stylewrappers::Button("Run", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
 		{
 			m_PythonInterpreter->exec();
 		}
@@ -663,8 +663,9 @@ void Manager::HandleFileNavigatorPopups()
 }
 void Manager::DisplayFileNavigator()
 {
-	auto& InputPath = m_FileBrowser->m_InputPath;
+	auto& InputPath = m_FileBrowserNavigationBuffer;
 	ImGui::InputText("Enter path", InputPath, sizeof(InputPath));
+	m_FileBrowser->SetInputPath(InputPath);
 	m_FileBrowser->ListDirectory(InputPath);
 	//auto& m_CurrentDirectory = m_FileBrowser->m_CurrentDirectory;
 
@@ -680,6 +681,7 @@ void Manager::DisplayFileNavigator()
 			if (std::filesystem::is_directory(r))
 			{
 				m_FileBrowser->SetInputPath(c_str);
+				memcpy(m_FileBrowserNavigationBuffer, c_str, str.size());
 			}
 			else
 			{
@@ -791,10 +793,11 @@ void Manager::HandleHexdumpPopups()
 		{
 			if (m_HexDumpSelectedIndex != -1)
 			{
+				int offset = (m_GlobalOffset - m_FileBrowser->m_CurrentBounds[0]) % m_MaximumLoadSize;
 				int newHexValue;
 				unsigned int parsedValue = 0;
 				std::istringstream(m_HexDumpHexEditorBuffer) >> std::hex >> parsedValue;
-				m_FileBrowser->m_FileLoadData[m_HexDumpSelectedIndex] = static_cast<unsigned char>(parsedValue);
+				m_FileBrowser->EditByte(m_HexDumpSelectedIndex, static_cast<unsigned char>(parsedValue)); // We have to use the EditByte() call to make sure edits can be saved
 			}
 
 			ImGui::CloseCurrentPopup();
@@ -806,6 +809,86 @@ void Manager::HandleHexdumpPopups()
 
 		ImGui::EndPopup();
 	}
+
+
+	// SAVE FILE POPUP
+	if (m_bShowSaveFilePopup)
+	{
+		ImGui::OpenPopup("SaveFilePopup");
+	}
+
+	if (ImGui::BeginPopup("SaveFilePopup"))
+	{
+		ImGui::InputText("Save to path:", m_SaveFilePathBuffer, _MAX_PATH);
+		bool show_error_text = false;
+
+		m_FileBrowser->SetInputPath(m_SaveFilePathBuffer);
+		m_FileBrowser->ListDirectory(m_SaveFilePathBuffer);
+		ImGui::BeginChild("SelectableList", ImVec2(600, 300), true, ImGuiWindowFlags_HorizontalScrollbar);
+		auto filtered = m_FileBrowser->DisplayFilter();
+		for (const auto& r : filtered)
+		{
+			auto str = r.path().string();
+			auto c_str = str.c_str();
+			if (ImGui::Selectable(c_str))
+			{
+				if (std::filesystem::is_directory(r) || std::filesystem::is_regular_file(r))
+				{
+					m_FileBrowser->SetInputPath(c_str);
+					memcpy(m_SaveFilePathBuffer, c_str, str.size());
+				}
+
+			}
+		}
+		ImGui::EndChild();
+
+		
+		if (stylewrappers::Button("Save File", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+		{
+			if (fs::exists(m_SaveFilePathBuffer))
+			{
+				if (!fs::remove(m_SaveFilePathBuffer))
+				{
+					show_error_text = true;
+				}
+				else
+				{
+					show_error_text = !m_FileBrowser->SaveFile(m_SaveFilePathBuffer);
+
+				}		
+			}
+			else
+			{
+				show_error_text = !m_FileBrowser->SaveFile(m_SaveFilePathBuffer);
+			}
+	
+			
+
+		}
+		ImGui::SameLine();
+		if (stylewrappers::Button("Done", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+		{
+			ImGui::CloseCurrentPopup();
+			m_bShowSaveFilePopup = false;
+			memset(m_SaveFilePathBuffer, 0x00, _MAX_PATH);
+		}
+
+
+		if (fs::exists(m_SaveFilePathBuffer))
+		{
+			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Warning: File already exists. File on disk will be overwritten.");
+		}
+
+
+		if (show_error_text)
+		{
+			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Error: could not save file");
+		}
+
+
+		ImGui::EndPopup();
+	}
+	
 
 }
 
@@ -858,6 +941,15 @@ void Manager::HandleHexdumpButtons()
 		}
 	}
 	ImGui::SameLine();
+
+	// SAVE FILE BUTTON
+	if (stylewrappers::Button("Save File", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	{
+		m_bShowSaveFilePopup = true;
+	}
+	ImGui::SameLine();
+
+
 }
 
 void Manager::HandleHexdump()
@@ -1449,7 +1541,7 @@ void Manager::HandleSectionHeaders()
 		{
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), sectionHeader[0].m_Name.c_str());
+			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), sectionHeader[r].m_Name.c_str());
 			for (int i = 0; i < 10; i++)
 			{
 				ImGui::TableSetColumnIndex(i+1);
@@ -1594,6 +1686,10 @@ std::vector<size_t> Manager::RequestByteScan(std::vector<unsigned char>& bytes)
 	return m_ByteScanner->byte_scan_file(m_FileBrowser, bytes, this);	// return the matches
 }
 
+int Manager::SaveFile(const std::string& path)
+{
+	return m_FileBrowser->SaveFile(path);
+}
 
 
 
@@ -1603,6 +1699,10 @@ std::vector<size_t> Manager::RequestByteScan(std::vector<unsigned char>& bytes)
 
 
 
+/*
+	This function replaces raw string formatting that is required by pybind11 for executing strings of text. 
+	By surrounding our scripts in newline characters we can avoid using raw strings which are super annoying to work with
+*/
 static std::string format_func(const std::string& format)
 {
 	std::string ret = std::format("\n{}\n", format);

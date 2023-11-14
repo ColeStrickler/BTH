@@ -156,6 +156,7 @@ public:
 	void SaveStructure(int struct_id) const;
 	void DeleteStructure(int struct_id);
 	std::vector<size_t> RequestByteScan(std::vector<unsigned char>& bytes);
+	int SaveFile(const std::string& path);
 
 	
 
@@ -217,6 +218,11 @@ private:
 		FILE BROWSER
 	*/
 	bool m_bShowFileSelectPopup;
+	bool m_bShowSaveFilePopup;
+	char m_FileBrowserNavigationBuffer[_MAX_PATH];
+	char m_SaveFilePathBuffer[_MAX_PATH];
+
+
 
 	/*
 		DECODER

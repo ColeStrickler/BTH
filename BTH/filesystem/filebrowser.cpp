@@ -1,5 +1,9 @@
 #include "filebrowser.h"
 
+/*
+    For some reason the Visual studio compiler was optimizing away this entire function such that it wasnt working
+*/
+#pragma optimize("", off) // Turn off optimizations
 FileBrowser::FileBrowser(size_t MaxLoadSize) : m_InputPath(""), m_MaxLoadSize(MaxLoadSize)
 {
 }
@@ -108,6 +112,11 @@ FB_RETCODE FileBrowser::LoadFile(const std::string& filepath, const size_t& offs
 
 
     FB_RETCODE RETURN_CODE = (m_LoadedFileName == filepath ? FB_RETCODE::OFFSET_CHANGE_LOAD : FB_RETCODE::FILE_CHANGE_LOAD);
+    if (RETURN_CODE == FB_RETCODE::FILE_CHANGE_LOAD)
+    {
+        m_Edits.clear();
+    }
+       
     unsigned long loadSize = (static_cast<size_t>(fileSize) - offset) > m_MaxLoadSize ? m_MaxLoadSize : (static_cast<size_t>(fileSize) - offset);
     m_CurrentBounds[0] = offset;
     m_CurrentBounds[1] =  offset + loadSize; // this will store the offsets to the portion of the file currently loaded
@@ -124,6 +133,15 @@ FB_RETCODE FileBrowser::LoadFile(const std::string& filepath, const size_t& offs
     utils::NewBuffer buffer(loadSize);
     file.read(reinterpret_cast<char*>(buffer.Get()), loadSize);
     auto tmp = std::vector<unsigned char>(buffer.Get(), buffer.Get() + loadSize);
+    // apply edits before return
+    int edit_index = static_cast<int>(offset / m_MaxLoadSize);
+    for (auto& edit : m_Edits[edit_index])
+    {
+        if (edit.m_Offset >= offset)
+            tmp[edit.m_Offset - offset] = edit.m_ByteValue;       
+    }
+
+
     m_FileLoadData = tmp;
     file.close();
     return RETURN_CODE;
@@ -142,6 +160,17 @@ std::vector<unsigned char> FileBrowser::LoadBytes(unsigned long long offset, DWO
     auto read = file.gcount();
     *numRead = read;
     auto ret = std::vector<unsigned char>(buffer.Get(), buffer.Get() + read);
+
+    // apply edits before return
+    int edit_index = static_cast<int>(offset / m_MaxLoadSize);
+    for (auto& edit : m_Edits[edit_index])
+    {
+        if (edit.m_Offset >= offset)
+            ret[edit.m_Offset - offset] = edit.m_ByteValue;
+    }
+
+
+
     file.close();
     return ret;
 }
@@ -152,3 +181,70 @@ void FileBrowser::SetInputPath(const std::string& new_inputpath)
     memcpy(m_InputPath, new_inputpath.c_str(), sizeof(char) * new_inputpath.size());
 }
 
+
+void FileBrowser::EditByte(int offset, unsigned char edit_value)
+{
+    if (offset < 0 || offset >= m_FileLoadData.size())
+    {
+        return;
+    }
+
+    int edit_key = static_cast<int>((m_CurrentBounds[0] + offset) / 200000);
+    FileEdit edit_data = { edit_value, m_CurrentBounds[0] + offset };       // we give the absolute index into the file
+    m_Edits[edit_key].push_back(edit_data);
+    m_FileLoadData[offset] = edit_value;
+}
+
+
+
+bool FileBrowser::SaveFile(const std::string& save_path)
+{
+    fs::path savefile = fs::path(save_path);
+
+    // Create the directories if they don't exist
+    fs::create_directories(savefile.parent_path());
+
+    // Open new file stream
+    std::ofstream outputFile(savefile, std::ios::binary);
+
+    DWORD read;
+    size_t offset = 0;
+    if (outputFile.is_open())
+    {
+        while (offset < m_LoadedFileSize)
+        {
+            auto FileBytes = LoadBytes(offset, m_MaxLoadSize, &read);
+            auto relevant_edits = m_Edits[static_cast<int>(offset / 200000)];
+            printf("edits %d\n", relevant_edits.size());
+            for (auto& edit : relevant_edits)
+            {
+                FileBytes[edit.m_Offset] = edit.m_ByteValue;
+            }
+
+
+            // Use write to handle binary data
+            outputFile.write(reinterpret_cast<char*>(FileBytes.data()), FileBytes.size());
+
+
+            offset += read;
+        }
+        outputFile.close();
+        if (offset != m_LoadedFileSize)
+            return 0;
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+int FileBrowser::PushByte(unsigned char byte)
+{
+    if (m_FileLoadData.size() >= m_MaxLoadSize)
+        return -1;
+
+    m_FileLoadData.push_back(byte);
+    return 0;
+}
+#pragma optimize("", on)  // Turn on optimizations
