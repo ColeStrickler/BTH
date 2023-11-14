@@ -18,7 +18,7 @@ exe_files = [dir_path+f for f in file_list if f.endswith('.exe')]
 print(exe_files)
 
 i = 0
-for path in exe_files[2:9]:
+for path in exe_files:
 	mgr.LoadFile(path)
 	scan = mgr.StringScan(5)
 	for s in scan:
