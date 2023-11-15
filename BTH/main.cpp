@@ -209,8 +209,6 @@ PYBIND11_EMBEDDED_MODULE(mgr, m) {
 
 
 
-
-
 	/*
 		mgr.NewStructure(std::string name)
 
@@ -340,6 +338,26 @@ PYBIND11_EMBEDDED_MODULE(mgr, m) {
 		return manager.RequestByteScan(byte_vector);
 	});
 
+
+	/*
+		mgr.ChangeColor(std::string component, float r, float g, float b)
+
+		This function takes in a component name string which must be one of the string
+		in COLORSETTINGS_QUERYSTRING listed in the db.h file
+
+		This function will then attempt to set this color setting to (r, g, b, 1.00f)
+
+	*/
+	m.def("ChangeColor", [](const std::string& component, float r, float g, float b) {
+		if (r < 0.0f || r > 1.0f || g < 0.0f || g > 1.0f || b < 0.0f || b > 1.0f)
+			return -1;
+
+
+		std::lock_guard<std::mutex> lock(manager.m_FunctionBindingsMutex);	// We gotta get this or we will be editing non thread safe structures
+		return manager.ColorChangeRequest(component, r, g, b);
+	});
+
+
 }
 
 
@@ -347,7 +365,7 @@ PYBIND11_EMBEDDED_MODULE(mgr, m) {
 int main()
 {
 	// We only need to initialize the python interpreter once so we can do it in main
-	pybind11::scoped_interpreter guard{};
+	
 	GLFWwindow* window = nullptr;
 
 	if (!glfwInit())

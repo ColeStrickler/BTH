@@ -17,7 +17,16 @@ static std::string ucharVecToHexString(std::vector<unsigned char>& vec)
 	return ret;
 }
 
+/*
+	This function replaces raw string formatting that is required by pybind11 for executing strings of text.
+	By surrounding our scripts in newline characters we can avoid using raw strings which are super annoying to work with
+*/
+static std::string format_func(const std::string& format)
+{
+	std::string ret = std::format("\n{}\n", format);
 
+	return ret;
+}
 
 
 Manager::Manager() : m_HexDumpWidth(475), m_HexDumpHeight(400), m_DecoderWidth(475), m_DecoderHeight(400), m_PEtableWidth(1600), m_PEtableHeight(500),
@@ -31,12 +40,20 @@ Manager::Manager() : m_HexDumpWidth(475), m_HexDumpHeight(400), m_DecoderWidth(4
 	auto t = std::thread(&Manager::BeginThreadManagerThread, this);
 	m_ThreadManagerThread = std::move(t);
 	InitDefaultStructs();
+	m_InterpreterThread = std::thread(&Manager::InterpreterThread, this);
+	
+
+
 }
 
 Manager::~Manager()
 {
 	m_bThreadManagerExit = true;
 	m_ThreadManagerThread.join();
+	
+	// We do detach instead of join as it allows us to exit if
+	// the script is in an infinite loop
+	m_InterpreterThread.detach();
 }
 
 
@@ -113,12 +130,18 @@ void Manager::RenderUI()
 		*/
 		ImGui::Dummy(ImVec2(100, 20));	// Same size as navigator buttons
 		// WE WILL NEED TO ADD CUSTOM COLOR SETTINGS FOR THIS
-		stylewrappers::MultilineText(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::HEXDUMP_BACKGROUND_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), \
+		stylewrappers::MultilineText(GetColorSetting(VISUALS_INDEX::HEXDUMP_BACKGROUND_COLOR), GetColorSetting(VISUALS_INDEX::TEXT_COLOR), \
 			m_PythonInterpreter->m_ScriptBuffer, 8192, ImVec2(WINDOW_WIDTH / 3, WINDOW_HEIGHT / 2 - 100));
 
-		if (stylewrappers::Button("Run", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
-		{
-			m_PythonInterpreter->exec();
+		if (stylewrappers::Button("Run", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
+		{		
+			std::string script = format_func(m_PythonInterpreter->m_ScriptBuffer + 1).c_str();
+			{
+				std::lock_guard<std::mutex> lock(m_InterpreterWorkItemsMutex);
+				m_InterpreterWorkItems.push_back(script);
+			}
+			m_InterpreterCV.notify_all();	// we only have one thread here anyways
+			//m_PythonInterpreter->exec();
 		}
 
 	}
@@ -161,7 +184,7 @@ void Manager::BeginThreadManagerThread()
 void Manager::BackgroundColorSettings()
 {
 	ImGuiStyle& style = ImGui::GetStyle();
-	style.Colors[ImGuiCol_WindowBg] = m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BACKGROUND_COLOR);
+	style.Colors[ImGuiCol_WindowBg] = GetColorSetting(VISUALS_INDEX::BACKGROUND_COLOR);
 }
 
 
@@ -198,7 +221,7 @@ void Manager::HandleMemoryDumpButton()
 	std::string display = (m_bShowMemoryDumpView ? "HexDump" : "MemoryDump");
 
 
-	if (stylewrappers::Button(display, m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	if (stylewrappers::Button(display, GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 	{
 		m_bShowMemoryDumpView = !m_bShowMemoryDumpView;
 	}
@@ -215,13 +238,13 @@ void Manager::HandleMemoryDumpStructureView()
 	if (m_MemoryDumpNewStructure_CurrentlySelected >= m_MemoryDumpStructureVec.size())
 		return;
 	auto structure = m_MemoryDumpStructureVec[m_MemoryDumpNewStructure_CurrentlySelected];
-	ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Currently Selected: %s", structure.m_Name.c_str());
+	ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Currently Selected: %s", structure.m_Name.c_str());
 	if (ImGui::BeginChild("StructureDump", ImVec2(WINDOW_WIDTH / 3, WINDOW_HEIGHT / 2 - 100)))
 	{
 		if (ImGui::BeginTable("Structure Dump View", 4))
 		{
 			{
-				stylewrappers::TableStyle TABLE_STYLE(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
+				stylewrappers::TableStyle TABLE_STYLE(GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
 				ImGui::TableSetupColumn("Field");
 				ImGui::TableSetupColumn("Value");
 				ImGui::TableSetupColumn("Size");
@@ -235,13 +258,13 @@ void Manager::HandleMemoryDumpStructureView()
 			{
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
-				ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "%s", data[r].m_SE.m_GivenName.c_str());;
+				ImGui::TextColored(GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "%s", data[r].m_SE.m_GivenName.c_str());;
 				ImGui::TableSetColumnIndex(1);
-				ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "%s", data[r].m_Display.c_str());;
+				ImGui::TextColored(GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "%s", data[r].m_Display.c_str());;
 				ImGui::TableSetColumnIndex(2);
-				ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "%d", data[r].m_SE.m_Size);
+				ImGui::TextColored(GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "%d", data[r].m_SE.m_Size);
 				ImGui::TableSetColumnIndex(3);
-				ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "%s", DumpDisplayType2String(data[r].m_SE.m_Display).c_str());
+				ImGui::TextColored(GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "%s", DumpDisplayType2String(data[r].m_SE.m_Display).c_str());
 			}
 			ImGui::EndTable();
 		}
@@ -266,7 +289,7 @@ void Manager::HandleMemoryDumpStructureEditor()
 		if (ImGui::BeginTable("Structure Editor", 1, 0, ImVec2(WINDOW_WIDTH/12, WINDOW_HEIGHT/2)))
 		{
 			{
-				stylewrappers::TableStyle TABLE_STYLE(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
+				stylewrappers::TableStyle TABLE_STYLE(GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
 				ImGui::TableSetupColumn("Structure", ImGuiTableColumnFlags_WidthFixed, WINDOW_WIDTH / 12);
 				ImGui::TableHeadersRow();
 			}
@@ -278,7 +301,7 @@ void Manager::HandleMemoryDumpStructureEditor()
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
 				ImGui::PushID(r);
-				if (stylewrappers::ColoredSelectable(structVec[r].m_Name, m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR)))
+				if (stylewrappers::ColoredSelectable(structVec[r].m_Name, GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR)))
 				{
 					m_MemoryDumpNewStructure_CurrentlySelected = r;
 				}
@@ -290,7 +313,7 @@ void Manager::HandleMemoryDumpStructureEditor()
 		if (ImGui::BeginTable("Structure Editor", 3))
 		{
 			{
-				stylewrappers::TableStyle TABLE_STYLE(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
+				stylewrappers::TableStyle TABLE_STYLE(GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
 				ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed, 100.0f);
 				ImGui::TableSetupColumn("Data Type", ImGuiTableColumnFlags_WidthFixed, 100.0f);
 				ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 100.0f);
@@ -306,7 +329,7 @@ void Manager::HandleMemoryDumpStructureEditor()
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
 					ImGui::PushID(10 * r + 0);
-					if (stylewrappers::ColoredSelectable(display_data[r].m_SE.m_GivenName, m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR)))
+					if (stylewrappers::ColoredSelectable(display_data[r].m_SE.m_GivenName, GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR)))
 					{
 						m_MemoryDumpNewStructure_MemberSelected.first = r;
 						m_MemoryDumpNewStructure_MemberSelected.second = 0;
@@ -315,7 +338,7 @@ void Manager::HandleMemoryDumpStructureEditor()
 					ImGui::PopID();
 					ImGui::TableSetColumnIndex(1);
 					ImGui::PushID(10 * r + 1);
-					if (stylewrappers::ColoredSelectable(DumpDisplayType2String(display_data[r].m_SE.m_Display), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR)))
+					if (stylewrappers::ColoredSelectable(DumpDisplayType2String(display_data[r].m_SE.m_Display), GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR)))
 					{
 						m_MemoryDumpNewStructure_MemberSelected.first = r;
 						m_MemoryDumpNewStructure_MemberSelected.second = 1;
@@ -324,7 +347,7 @@ void Manager::HandleMemoryDumpStructureEditor()
 					ImGui::PopID();
 					ImGui::TableSetColumnIndex(2);
 					ImGui::PushID(10 * r + 2);
-					if (stylewrappers::ColoredSelectable(std::to_string(display_data[r].m_SE.m_Size), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR)))
+					if (stylewrappers::ColoredSelectable(std::to_string(display_data[r].m_SE.m_Size), GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR)))
 					{
 						m_MemoryDumpNewStructure_MemberSelected.first = r;
 						m_MemoryDumpNewStructure_MemberSelected.second = 2;
@@ -339,13 +362,13 @@ void Manager::HandleMemoryDumpStructureEditor()
 		ImGui::EndChild();
 	}
 	HandleMemoryDumpMemberEditPopup();
-	if (stylewrappers::Button("New Struct", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	if (stylewrappers::Button("New Struct", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 	{
 		m_bMemoryDumpShowAddStructurePopup = true;
 	}
 	HandleMemoryDumpNewStructurePopup();
 	ImGui::SameLine();
-	if (stylewrappers::Button("New Member", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	if (stylewrappers::Button("New Member", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 	{
 		if (m_MemoryDumpNewStructure_CurrentlySelected < m_MemoryDumpStructureVec.size())
 		{
@@ -357,13 +380,13 @@ void Manager::HandleMemoryDumpStructureEditor()
 		
 	}
 	ImGui::SameLine();
-	if (stylewrappers::Button("Remove Member", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	if (stylewrappers::Button("Remove Member", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 	{
 		if (m_MemoryDumpStructureVec.size())
 			m_MemoryDumpStructureVec[m_MemoryDumpNewStructure_CurrentlySelected].RemoveEntry();
 	}
 	ImGui::SameLine();
-	if (stylewrappers::Button("Save Struct", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	if (stylewrappers::Button("Save Struct", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 	{
 		if (m_MemoryDumpNewStructure_CurrentlySelected < m_MemoryDumpStructureVec.size())
 		{
@@ -372,7 +395,7 @@ void Manager::HandleMemoryDumpStructureEditor()
 		}
 	}
 	
-	if (stylewrappers::Button("Delete Struct", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	if (stylewrappers::Button("Delete Struct", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 	{
 		if (m_MemoryDumpNewStructure_CurrentlySelected < m_MemoryDumpStructureVec.size())
 		{
@@ -404,13 +427,13 @@ void Manager::HandleMemoryDumpNewStructurePopup()
 	{
 		ImGui::InputText("Structure Name", m_MemoryDumpNewStructureBuffer, 20);
 		ImGui::SameLine();
-		if (stylewrappers::Button("Add Structure", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
+		if (stylewrappers::Button("Add Structure", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
 		{
 			auto struct_name = std::string(m_MemoryDumpNewStructureBuffer);
 			m_MemoryDumpStructureVec.push_back(MemDumpStructure(struct_name));
 		}
 		ImGui::SameLine();
-		if (stylewrappers::Button("Done", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
+		if (stylewrappers::Button("Done", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
 		{
 			m_bMemoryDumpShowAddStructurePopup = false;
 			ImGui::CloseCurrentPopup();
@@ -470,7 +493,7 @@ void Manager::HandleMemoryDumpMemberEditPopup()
 				break;
 		}
 
-		if (stylewrappers::Button("Apply Changes", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
+		if (stylewrappers::Button("Apply Changes", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
 		{
 			switch (selected_field)
 			{
@@ -496,7 +519,7 @@ void Manager::HandleMemoryDumpMemberEditPopup()
 			memset(m_MemoryDumpMemberEditBuffer, 0x00, 20);
 		}
 		ImGui::SameLine();
-		if (stylewrappers::Button("Done", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
+		if (stylewrappers::Button("Done", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
 		{
 			m_bMemoryDumpShowMemberEditPopup = false;
 			ImGui::CloseCurrentPopup();
@@ -523,7 +546,7 @@ void Manager::HandleSettings()
 
 void Manager::HandleSettingsButton()
 {
-	if (stylewrappers::Button("Settings", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	if (stylewrappers::Button("Settings", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 	{
 		m_bSettingsShowPopup = true;
 	}
@@ -577,7 +600,7 @@ void Manager::DisplayVisualSettings()
 	if (ImGui::BeginTable("Visual Settings", 5))
 	{
 		{
-			stylewrappers::TableStyle TABLE_STYLE(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
+			stylewrappers::TableStyle TABLE_STYLE(GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
 			ImGui::TableSetupColumn("Setting", ImGuiTableColumnFlags_WidthFixed, 200.0f);
 			ImGui::TableSetupColumn("R", ImGuiTableColumnFlags_None);
 			ImGui::TableSetupColumn("G", ImGuiTableColumnFlags_None);
@@ -589,34 +612,34 @@ void Manager::DisplayVisualSettings()
 		auto rows = COLORSETTINGS_QUERYSTRING.size();
 		for (int r = 0; r < rows; r++)
 		{
-			auto curr_color = m_DataBaseManager->GetColorSetting((VISUALS_INDEX)r);
+			auto curr_color = GetColorSetting((VISUALS_INDEX)r);
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
-			if (stylewrappers::ColoredSelectable(COLORSETTINGS_QUERYSTRING[r].c_str(), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR)))
+			if (stylewrappers::ColoredSelectable(COLORSETTINGS_QUERYSTRING[r].c_str(), GetColorSetting(VISUALS_INDEX::TEXT_COLOR)))
 			{
 				m_CurrentSelectedVisualsIndex = (VISUALS_INDEX)r;
 				m_VisualSettingsColorSelector = curr_color;
 			}
 			ImGui::TableSetColumnIndex(1);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%.2f", curr_color.x);
+			ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%.2f", curr_color.x);
 			ImGui::TableSetColumnIndex(2);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%.2f", curr_color.y);
+			ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%.2f", curr_color.y);
 			ImGui::TableSetColumnIndex(3);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%.2f", curr_color.z);
+			ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%.2f", curr_color.z);
 			ImGui::TableSetColumnIndex(4);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%.2f", curr_color.w);
+			ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%.2f", curr_color.w);
 		}
 		ImGui::EndTable();
 	}
 	ImGui::NextColumn();
-	ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Currently selected: %s", COLORSETTINGS_QUERYSTRING[(int)m_CurrentSelectedVisualsIndex].c_str());
+	ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Currently selected: %s", COLORSETTINGS_QUERYSTRING[(int)m_CurrentSelectedVisualsIndex].c_str());
 	ImGui::SliderFloat("Red",	&m_VisualSettingsColorSelector.x, 0.0f, 1.0f);
 	ImGui::SliderFloat("Green", &m_VisualSettingsColorSelector.y, 0.0f, 1.0f);
 	ImGui::SliderFloat("Blue",	&m_VisualSettingsColorSelector.z, 0.0f, 1.0f);
 	ImGui::ColorButton("MyColoredBox", m_VisualSettingsColorSelector, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoTooltip, ImVec2(300, 20));
 
 	// Update Database with changes and reload settings to match updates
-	if (stylewrappers::Button("Apply Changes", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	if (stylewrappers::Button("Apply Changes", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 	{
 		m_DataBaseManager->UpdateColorSetting(COLORSETTINGS_QUERYSTRING[(int)m_CurrentSelectedVisualsIndex], m_VisualSettingsColorSelector);
 	}
@@ -625,6 +648,12 @@ void Manager::DisplayVisualSettings()
 
 void Manager::DisplayPerformanceSettings()
 {
+}
+
+ImVec4 Manager::GetColorSetting(VISUALS_INDEX index)
+{
+	std::lock_guard<std::mutex> lock(m_FunctionBindingsMutex);	// we do this to avoid data races with certain binding functions
+	return m_DataBaseManager->GetColorSetting(index);
 }
 
 
@@ -636,7 +665,7 @@ void Manager::DisplayPerformanceSettings()
 
 void Manager::HandleFileNavigatorButtons()
 {
-	if (stylewrappers::Button("Select File", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	if (stylewrappers::Button("Select File", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 	{
 		m_bShowFileSelectPopup = true;
 	}
@@ -653,7 +682,7 @@ void Manager::HandleFileNavigatorPopups()
 
 		DisplayFileNavigator();
 		
-		if (stylewrappers::Button("Done", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
+		if (stylewrappers::Button("Done", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
 		{
 			m_bShowFileSelectPopup = false;
 			ImGui::CloseCurrentPopup();
@@ -717,7 +746,7 @@ int Manager::DrawHexValuesWindow()
 {
 	
 	ImGui::BeginChild("ScrollingRegion", ImVec2(m_HexDumpWidth, m_HexDumpHeight), false);
-	stylewrappers::HexDumpBackgroundStyle(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::HEXDUMP_BACKGROUND_COLOR));
+	stylewrappers::HexDumpBackgroundStyle(GetColorSetting(VISUALS_INDEX::HEXDUMP_BACKGROUND_COLOR));
 
 
 	std::vector<unsigned char>& hexValues = m_FileBrowser->m_FileLoadData;
@@ -742,6 +771,11 @@ int Manager::DrawHexValuesWindow()
 	ImGui::Spacing();
 	ImGui::Spacing();
 
+	// if we pull these out so they are only called once we can optimize use of the mutex and speed our scripts that
+	// change colors up
+	auto hex_dump_button_color = GetColorSetting(VISUALS_INDEX::HEXDUMP_BUTTON_COLOR);
+	auto hex_dump_buttontext_color = GetColorSetting(VISUALS_INDEX::HEXDUMP_TEXT_COLOR);
+
 	for (int row = 0; row < numRows; ++row) {
 		for (int col = 0; col < bytesPerRow; ++col) {
 			int offset = (m_GlobalOffset - m_FileBrowser->m_CurrentBounds[0]) % m_MaximumLoadSize;
@@ -759,8 +793,8 @@ int Manager::DrawHexValuesWindow()
 
 
 				//ImGui::Button(value.c_str(), ImVec2(20, 20);
-				if (stylewrappers::Button(value, m_DataBaseManager->GetColorSetting(VISUALS_INDEX::HEXDUMP_BUTTON_COLOR),
-					ImVec2(20, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::HEXDUMP_TEXT_COLOR)))
+				if (stylewrappers::Button(value, hex_dump_button_color,
+					ImVec2(20, 20), hex_dump_buttontext_color))
 				{
 					ret = index;
 				}
@@ -789,7 +823,7 @@ void Manager::HandleHexdumpPopups()
 	{
 		ImGui::InputText("Hex Value", m_HexDumpHexEditorBuffer, 3);
 		ImGui::Text("Current Value: 0x%x", m_FileBrowser->m_FileLoadData[m_HexDumpSelectedIndex]);
-		if (stylewrappers::Button("Set", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+		if (stylewrappers::Button("Set", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 		{
 			if (m_HexDumpSelectedIndex != -1)
 			{
@@ -843,7 +877,7 @@ void Manager::HandleHexdumpPopups()
 		ImGui::EndChild();
 
 		
-		if (stylewrappers::Button("Save File", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+		if (stylewrappers::Button("Save File", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 		{
 			if (fs::exists(m_SaveFilePathBuffer))
 			{
@@ -866,7 +900,7 @@ void Manager::HandleHexdumpPopups()
 
 		}
 		ImGui::SameLine();
-		if (stylewrappers::Button("Done", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+		if (stylewrappers::Button("Done", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 		{
 			ImGui::CloseCurrentPopup();
 			m_bShowSaveFilePopup = false;
@@ -876,13 +910,13 @@ void Manager::HandleHexdumpPopups()
 
 		if (fs::exists(m_SaveFilePathBuffer))
 		{
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Warning: File already exists. File on disk will be overwritten.");
+			ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Warning: File already exists. File on disk will be overwritten.");
 		}
 
 
 		if (show_error_text)
 		{
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Error: could not save file");
+			ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Error: could not save file");
 		}
 
 
@@ -899,7 +933,7 @@ void Manager::HandleHexdumpButtons()
 		If it is, then we call LoadFile to see if we need to load a different portion of the file
 	*/
 	ImGui::SetNextItemWidth(200.0f);
-	stylewrappers::ColoredInputText(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Offset", m_OffsetEditorBuffer, sizeof(m_OffsetEditorBuffer), ImGuiInputTextFlags_CharsHexadecimal);
+	stylewrappers::ColoredInputText(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Offset", m_OffsetEditorBuffer, sizeof(m_OffsetEditorBuffer), ImGuiInputTextFlags_CharsHexadecimal);
 	std::string offset(m_OffsetEditorBuffer);
 	int new_offset = utils::stringToHex(offset);
 
@@ -916,7 +950,7 @@ void Manager::HandleHexdumpButtons()
 		}
 	}
 	
-	ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Loaded File: %s\t File Size: %x\n", m_FileBrowser->m_LoadedFileName.c_str(), m_FileBrowser->m_LoadedFileSize);
+	ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Loaded File: %s\t File Size: %x\n", m_FileBrowser->m_LoadedFileName.c_str(), m_FileBrowser->m_LoadedFileSize);
 	
 	// Show error message if offset is bigger than file
 	if (m_GlobalOffset > m_FileBrowser->m_LoadedFileSize)
@@ -928,14 +962,14 @@ void Manager::HandleHexdumpButtons()
 	// ASCII Button
 	if (m_bHexDumpShowAscii)
 	{
-		if (stylewrappers::Button("Show Hex", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+		if (stylewrappers::Button("Show Hex", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 		{
 			m_bHexDumpShowAscii = !m_bHexDumpShowAscii;
 		}
 	}
 	else
 	{
-		if (stylewrappers::Button("Show Ascii", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+		if (stylewrappers::Button("Show Ascii", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 		{
 			m_bHexDumpShowAscii = !m_bHexDumpShowAscii;
 		}
@@ -943,7 +977,7 @@ void Manager::HandleHexdumpButtons()
 	ImGui::SameLine();
 
 	// SAVE FILE BUTTON
-	if (stylewrappers::Button("Save File", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	if (stylewrappers::Button("Save File", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 	{
 		m_bShowSaveFilePopup = true;
 	}
@@ -996,17 +1030,17 @@ ImVec4 Manager::GetFont(DecodedInst& inst)
 {
 	if (inst.m_DecodedInstruction.substr(0, 3) == "mov")
 	{
-		return m_DataBaseManager->GetColorSetting(VISUALS_INDEX::DISASSEMBLY_INST1_COLOR);
+		return GetColorSetting(VISUALS_INDEX::DISASSEMBLY_INST1_COLOR);
 	}
 	if (inst.m_DecodedInstruction.substr(0, 1) == "j")
 	{
-		return m_DataBaseManager->GetColorSetting(VISUALS_INDEX::DISASSEMBLY_INST2_COLOR);
+		return GetColorSetting(VISUALS_INDEX::DISASSEMBLY_INST2_COLOR);
 	}
 	if (inst.m_DecodedInstruction.substr(0, 3) == "sub" || inst.m_DecodedInstruction.substr(0, 3) == "add")
 	{
-		return m_DataBaseManager->GetColorSetting(VISUALS_INDEX::DISASSEMBLY_INST3_COLOR);
+		return GetColorSetting(VISUALS_INDEX::DISASSEMBLY_INST3_COLOR);
 	}
-	return m_DataBaseManager->GetColorSetting(VISUALS_INDEX::DISASSEMBLY_INST4_COLOR);
+	return GetColorSetting(VISUALS_INDEX::DISASSEMBLY_INST4_COLOR);
 }
 
 
@@ -1024,7 +1058,7 @@ void Manager::HandleByteScanner()
 
 void Manager::HandleByteScannerPopupButton()
 {
-	if (stylewrappers::Button("Scan", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	if (stylewrappers::Button("Scan", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 	{
 
 		m_ByteScannerPattern.clear();
@@ -1041,7 +1075,7 @@ void Manager::HandleByteScannerPopupButton()
 		}
 	}
 	ImGui::SameLine();
-	if (stylewrappers::Button("Close", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	if (stylewrappers::Button("Close", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 	{
 		m_bByteShowScannerPopup = false;
 
@@ -1052,8 +1086,8 @@ void Manager::HandleByteScannerPopupButton()
 	ImGui::ProgressBar(m_ByteScannerProgress, ImVec2(150, 30));
 	if (m_bByteScannerFinished)
 	{
-		ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Scanned %d bytes in %.2f s.", m_ByteScannerBytesScanned, m_ByteScanner->m_ByteScanTime.count());
-		ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Found %d matches.", m_ByteScanner->m_ByteMatches.size());
+		ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Scanned %d bytes in %.2f s.", m_ByteScannerBytesScanned, m_ByteScanner->m_ByteScanTime.count());
+		ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Found %d matches.", m_ByteScanner->m_ByteMatches.size());
 
 		for (int i = 0; i < min(m_ByteScanner->m_ByteMatches.size(), MAX_SCANNER_DISPLAY); i++)
 		{
@@ -1067,7 +1101,7 @@ void Manager::HandleByteScannerPopupButton()
 
 void Manager::HandleByteScannerButton()
 {
-	if (stylewrappers::Button("Byte Scan", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	if (stylewrappers::Button("Byte Scan", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 	{
 		m_bByteShowScannerPopup = true;
 	}
@@ -1099,7 +1133,7 @@ void Manager::HandleByteScannerPopup()
 			ImGui::PushID(i);
 
 			auto value = ucharToHexString(m_ByteScannerPatternBuffer[i]);
-			if (stylewrappers::Button(value, m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(20, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR))) {
+			if (stylewrappers::Button(value, GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(20, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR))) {
 				m_ByteScannerSelectedIndex = i;
 				m_bByteScannerShowPatternEditPopup = true;
 			}
@@ -1124,8 +1158,8 @@ void Manager::HandleByteScannerPopup()
 		if (ImGui::BeginPopup("Edit Byte"))
 		{
 			ImGui::InputText("Hex Value", m_ByteScannerPatternEditorBuffer, 3);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Current Value: 0x%x", m_ByteScannerPatternBuffer[m_ByteScannerSelectedIndex]);
-			if (stylewrappers::Button("Set", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+			ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Current Value: 0x%x", m_ByteScannerPatternBuffer[m_ByteScannerSelectedIndex]);
+			if (stylewrappers::Button("Set", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 			{
 				if (m_HexDumpSelectedIndex != -1)
 				{
@@ -1158,7 +1192,7 @@ void Manager::HandleStringScanner()
 
 void Manager::HandleStringScannerButton()
 {
-	if (stylewrappers::Button("String Scan", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+	if (stylewrappers::Button("String Scan", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 	{
 		m_bStringScannerShowPopup = !m_bStringScannerShowPopup;
 	}
@@ -1187,7 +1221,7 @@ void Manager::HandleStringScannerPopup()
 		}
 		ImGui::SameLine();
 
-		if (stylewrappers::Button("Close", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
+		if (stylewrappers::Button("Close", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR), ImVec2(100, 20), GetColorSetting(VISUALS_INDEX::BUTTON_TEXT_COLOR)))
 		{
 			m_bStringScannerShowPopup = false;
 			ImGui::CloseCurrentPopup();
@@ -1198,8 +1232,8 @@ void Manager::HandleStringScannerPopup()
 		auto matches = m_ByteScanner->m_StringMatches;
 		if (m_bStringScannerFinished)
 		{
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Scanned %d bytes for strings in %.2f s", m_FileBrowser->m_LoadedFileSize, m_ByteScanner->m_StringScanTime);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%d ASCII matches, %d Unicode Matches", matches.m_StandardStrings.size(), matches.m_UnicodeStrings.size());
+			ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "Scanned %d bytes for strings in %.2f s", m_FileBrowser->m_LoadedFileSize, m_ByteScanner->m_StringScanTime);
+			ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%d ASCII matches, %d Unicode Matches", matches.m_StandardStrings.size(), matches.m_UnicodeStrings.size());
 		}
 		else
 		{
@@ -1215,7 +1249,7 @@ void Manager::HandleStringScannerPopup()
 			{
 
 				{
-					stylewrappers::TableStyle TABLE_STYLE(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
+					stylewrappers::TableStyle TABLE_STYLE(GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
 					ImGui::TableSetupColumn("Offset");
 					ImGui::TableSetupColumn("ASCII String");
 					ImGui::TableHeadersRow();
@@ -1227,9 +1261,9 @@ void Manager::HandleStringScannerPopup()
 					
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
-					ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%x", strings[r].m_Offset);
+					ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%x", strings[r].m_Offset);
 					ImGui::TableSetColumnIndex(1);
-					ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%s", strings[r].m_StringVal.c_str());
+					ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%s", strings[r].m_StringVal.c_str());
 				}
 				ImGui::EndTable();
 			}
@@ -1246,9 +1280,9 @@ void Manager::HandleStringScannerPopup()
 				{
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
-					ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%x", strings[r].m_Offset);
+					ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%x", strings[r].m_Offset);
 					ImGui::TableSetColumnIndex(1);
-					ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%ws", strings[r].m_StringVal.c_str());
+					ImGui::TextColored(GetColorSetting(VISUALS_INDEX::TEXT_COLOR), "%ws", strings[r].m_StringVal.c_str());
 				}
 				ImGui::EndTable();
 			}
@@ -1279,28 +1313,31 @@ void Manager::HandlePeDump()
 
 void Manager::HandlePeFileFormatButtons()
 {
-	if (stylewrappers::Button("DOS Header", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTON_COLOR), ImVec2(150, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTONTEXT_COLOR)))
+	auto pe_button_color = GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTON_COLOR);
+	auto pe_buttontext_color = GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTONTEXT_COLOR);
+
+	if (stylewrappers::Button("DOS Header", pe_button_color, ImVec2(150, 20), pe_buttontext_color))
 		m_PEselected = PEINFO::DOS_HEADER;
 	ImGui::SameLine();
-	if (stylewrappers::Button("Rich Header", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTON_COLOR), ImVec2(150, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTONTEXT_COLOR)))
+	if (stylewrappers::Button("Rich Header", pe_button_color, ImVec2(150, 20), pe_buttontext_color))
 		m_PEselected = PEINFO::RICH_HEADER;
 	ImGui::SameLine();
-	if (stylewrappers::Button("File Header", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTON_COLOR), ImVec2(150, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTONTEXT_COLOR)))
+	if (stylewrappers::Button("File Header", pe_button_color, ImVec2(150, 20), pe_buttontext_color))
 		m_PEselected = PEINFO::FILE_HEADER;
 	ImGui::SameLine();
-	if (stylewrappers::Button("Optional Header", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTON_COLOR), ImVec2(150, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTONTEXT_COLOR)))
+	if (stylewrappers::Button("Optional Header", pe_button_color, ImVec2(150, 20), pe_buttontext_color))
 		m_PEselected = PEINFO::OPTIONAL_HEADER;
 	ImGui::SameLine();
-	if (stylewrappers::Button("Data Directories", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTON_COLOR), ImVec2(150, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTONTEXT_COLOR)))
+	if (stylewrappers::Button("Data Directories", pe_button_color, ImVec2(150, 20), pe_buttontext_color))
 		m_PEselected = PEINFO::DATA_DIRECTORIES;
 	ImGui::SameLine();
-	if (stylewrappers::Button("Section Headers", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTON_COLOR), ImVec2(150, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTONTEXT_COLOR)))
+	if (stylewrappers::Button("Section Headers", pe_button_color, ImVec2(150, 20), pe_buttontext_color))
 		m_PEselected = PEINFO::SECTION_HEADERS;
 	ImGui::SameLine();
-	if (stylewrappers::Button("Imports", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTON_COLOR), ImVec2(150, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTONTEXT_COLOR)))
+	if (stylewrappers::Button("Imports", pe_button_color, ImVec2(150, 20), pe_buttontext_color))
 		m_PEselected = PEINFO::IMPORTS;
 	ImGui::SameLine();
-	if (stylewrappers::Button("Exports", m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTON_COLOR), ImVec2(150, 20), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_BUTTONTEXT_COLOR)))
+	if (stylewrappers::Button("Exports", pe_button_color, ImVec2(150, 20), pe_buttontext_color))
 		m_PEselected = PEINFO::EXPORTS;
 }
 
@@ -1355,7 +1392,7 @@ void Manager::HandleDosHeader()
 	if (ImGui::BeginTable("Dos Header", 3))
 	{
 		{
-			stylewrappers::TableStyle PE_TABLE_STYLE(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
+			stylewrappers::TableStyle PE_TABLE_STYLE(GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
 			ImGui::TableSetupColumn("Offset");
 			ImGui::TableSetupColumn("Field Name");
 			ImGui::TableSetupColumn("Value");
@@ -1364,15 +1401,16 @@ void Manager::HandleDosHeader()
 
 		auto dosHeader = m_PEDisector->m_ParsedDosHeader;
 		auto rows = dosHeader.size();
+		auto text_color = GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR);
 		for (int r = 0; r < rows; r++)
 		{
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "%x", dosHeader[r].m_Offset);
+			ImGui::TextColored(text_color, "%x", dosHeader[r].m_Offset);
 			ImGui::TableSetColumnIndex(1);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), dosHeader[r].m_Name.c_str());
+			ImGui::TextColored(text_color, dosHeader[r].m_Name.c_str());
 			ImGui::TableSetColumnIndex(2);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), ucharVecToHexString(dosHeader[r].m_Bytes).c_str());
+			ImGui::TextColored(text_color, ucharVecToHexString(dosHeader[r].m_Bytes).c_str());
 		}
 		ImGui::EndTable();
 	}
@@ -1392,7 +1430,7 @@ void Manager::HandleRichHeader()
 	if (ImGui::BeginTable("Rich Header", 7))
 	{
 		{
-			stylewrappers::TableStyle PE_TABLE_STYLE(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
+			stylewrappers::TableStyle PE_TABLE_STYLE(GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
 			ImGui::TableSetupColumn("Field Name");
 			ImGui::TableSetupColumn("Value");
 			ImGui::TableSetupColumn("Meaning");
@@ -1404,25 +1442,26 @@ void Manager::HandleRichHeader()
 		}
 
 		auto rows = rhEntries.size();
+		auto text_color = GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR);
 		for (int r = 0; r < rows; r++)
 		{
 			ImGui::TableNextRow();
 			auto current = rhEntries[r];
 			// handle new row
 			ImGui::TableSetColumnIndex(0);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "Comp ID");
+			ImGui::TextColored(text_color, "Comp ID");
 			ImGui::TableSetColumnIndex(1);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), ucharVecToHexString(current.m_Raw).c_str());
+			ImGui::TextColored(text_color, ucharVecToHexString(current.m_Raw).c_str());
 			ImGui::TableSetColumnIndex(2);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), RichHeaderMeaning(current).c_str());
+			ImGui::TextColored(text_color, RichHeaderMeaning(current).c_str());
 			ImGui::TableSetColumnIndex(3);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), current.m_prodIDMeaning.c_str());
+			ImGui::TextColored(text_color, current.m_prodIDMeaning.c_str());
 			ImGui::TableSetColumnIndex(4);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "%d", current.m_buildID);
+			ImGui::TextColored(text_color, "%d", current.m_buildID);
 			ImGui::TableSetColumnIndex(5);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "%d", current.m_useCount);
+			ImGui::TextColored(text_color, "%d", current.m_useCount);
 			ImGui::TableSetColumnIndex(6);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), current.m_vsVersion.c_str());
+			ImGui::TextColored(text_color, current.m_vsVersion.c_str());
 		}
 		ImGui::EndTable();
 	}
@@ -1434,7 +1473,7 @@ void Manager::HandleFileHeader()
 	if (ImGui::BeginTable("File Header", 3))
 	{
 		{
-			stylewrappers::TableStyle PE_TABLE_STYLE(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
+			stylewrappers::TableStyle PE_TABLE_STYLE(GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
 			ImGui::TableSetupColumn("Offset");
 			ImGui::TableSetupColumn("Field Name");
 			ImGui::TableSetupColumn("Value");
@@ -1442,15 +1481,16 @@ void Manager::HandleFileHeader()
 		}
 
 		auto rows = fileHeader.size();
+		auto text_color = GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR);
 		for (int r = 0; r < rows; r++)
 		{
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "%x", fileHeader[r].m_Offset);
+			ImGui::TextColored(text_color, "%x", fileHeader[r].m_Offset);
 			ImGui::TableSetColumnIndex(1);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), fileHeader[r].m_Name.c_str());
+			ImGui::TextColored(text_color, fileHeader[r].m_Name.c_str());
 			ImGui::TableSetColumnIndex(2);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), ucharVecToHexString(fileHeader[r].m_Bytes).c_str());
+			ImGui::TextColored(text_color, ucharVecToHexString(fileHeader[r].m_Bytes).c_str());
 		}
 		ImGui::EndTable();
 	}
@@ -1461,7 +1501,7 @@ void Manager::HandleOptionalHeader()
 	if (ImGui::BeginTable("Optional Header", 3))
 	{
 		{
-			stylewrappers::TableStyle PE_TABLE_STYLE(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
+			stylewrappers::TableStyle PE_TABLE_STYLE(GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
 			ImGui::TableSetupColumn("Offset");
 			ImGui::TableSetupColumn("Field Name");
 			ImGui::TableSetupColumn("Value");
@@ -1470,15 +1510,16 @@ void Manager::HandleOptionalHeader()
 
 		auto ntHeader = m_PEDisector->m_ParsedOptionalHeader;
 		auto rows = ntHeader.size();
+		auto text_color = GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR);
 		for (int r = 0; r < rows; r++)
 		{
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), "%x", ntHeader[r].m_Offset);
+			ImGui::TextColored(text_color, "%x", ntHeader[r].m_Offset);
 			ImGui::TableSetColumnIndex(1);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), ntHeader[r].m_Name.c_str());
+			ImGui::TextColored(text_color, ntHeader[r].m_Name.c_str());
 			ImGui::TableSetColumnIndex(2);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), ucharVecToHexString(ntHeader[r].m_Bytes).c_str());
+			ImGui::TextColored(text_color, ucharVecToHexString(ntHeader[r].m_Bytes).c_str());
 		}
 		ImGui::EndTable();
 	}
@@ -1490,7 +1531,7 @@ void Manager::HandleDataDirectories()
 	{
 		
 		{
-			stylewrappers::TableStyle PE_TABLE_STYLE(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
+			stylewrappers::TableStyle PE_TABLE_STYLE(GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
 			ImGui::TableSetupColumn("Field Name");
 			ImGui::TableSetupColumn("Virtual Address");
 			ImGui::TableSetupColumn("Size");
@@ -1499,17 +1540,17 @@ void Manager::HandleDataDirectories()
 		}
 		auto& dataDir = m_PEDisector->m_ParsedDataDirectory_Opt;
 		int num_rows = dataDir.size();
-
+		auto text_color = GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR);
 		for (int i = 0; i < num_rows; i++)
 		{
 			auto& curr = dataDir[i];
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), curr.m_Name.c_str());
+			ImGui::TextColored(text_color, curr.m_Name.c_str());
 			ImGui::TableSetColumnIndex(1);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), ucharVecToHexString(curr.m_VirtualAddress).c_str());
+			ImGui::TextColored(text_color, ucharVecToHexString(curr.m_VirtualAddress).c_str());
 			ImGui::TableSetColumnIndex(2);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), ucharVecToHexString(curr.m_Size).c_str());
+			ImGui::TextColored(text_color, ucharVecToHexString(curr.m_Size).c_str());
 		}
 		ImGui::EndTable();
 	}
@@ -1520,7 +1561,7 @@ void Manager::HandleSectionHeaders()
 	if (ImGui::BeginTable("Section Header", 11))
 	{			
 		{
-			stylewrappers::TableStyle PE_TABLE_STYLE(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
+			stylewrappers::TableStyle PE_TABLE_STYLE(GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
 			ImGui::TableSetupColumn("Field Name");
 			ImGui::TableSetupColumn("Misc.PhysicalAddress");
 			ImGui::TableSetupColumn("Misc.VirtualSize");
@@ -1537,15 +1578,16 @@ void Manager::HandleSectionHeaders()
 
 		auto sectionHeader = m_PEDisector->m_ParsedSectionHeaders;
 		auto rows = sectionHeader.size();
+		auto text_color = GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR);
 		for (int r = 0; r < rows; r++)
 		{
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
-			ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), sectionHeader[r].m_Name.c_str());
+			ImGui::TextColored(text_color, sectionHeader[r].m_Name.c_str());
 			for (int i = 0; i < 10; i++)
 			{
 				ImGui::TableSetColumnIndex(i+1);
-				ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), ucharVecToHexString(sectionHeader[r].m_SectionData[i].m_Bytes).c_str());
+				ImGui::TextColored(text_color, ucharVecToHexString(sectionHeader[r].m_SectionData[i].m_Bytes).c_str());
 			}
 		}
 		ImGui::EndTable();
@@ -1566,7 +1608,7 @@ void Manager::HandleImports()
 	if (ImGui::BeginTable("Functions", 7))
 	{
 		{
-			stylewrappers::TableStyle PE_TABLE_STYLE(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
+			stylewrappers::TableStyle PE_TABLE_STYLE(GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
 			ImGui::TableSetupColumn("Library");
 			ImGui::TableSetupColumn("Characteristics");
 			ImGui::TableSetupColumn("OrginalFirstThunk");
@@ -1576,12 +1618,12 @@ void Manager::HandleImports()
 			ImGui::TableSetupColumn("FirstThunk");
 			ImGui::TableHeadersRow();
 		}
-		
+		auto text_color = GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR);
 		for (int row = 0; row < imports.size(); row++)
 		{
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
-			if (stylewrappers::ColoredSelectable(imports[row].m_Library, m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR)))
+			if (stylewrappers::ColoredSelectable(imports[row].m_Library, text_color))
 			{
 				m_PEselectedImportView = x;
 			}
@@ -1589,7 +1631,7 @@ void Manager::HandleImports()
 			for (int column = 1; column < 7; column++)
 			{
 				ImGui::TableSetColumnIndex(column);
-				ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), ucharVecToHexString(imports[row].m_ImportDescriptorData[column-1].m_Bytes).c_str());
+				ImGui::TextColored(text_color, ucharVecToHexString(imports[row].m_ImportDescriptorData[column-1].m_Bytes).c_str());
 			}
 		}
 		ImGui::EndTable();
@@ -1606,7 +1648,7 @@ void Manager::HandleImports()
 		if (ImGui::BeginTable("Functions", 3))
 		{
 			{
-				stylewrappers::TableStyle PE_TABLE_STYLE(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
+				stylewrappers::TableStyle PE_TABLE_STYLE(GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADER_COLOR), GetColorSetting(VISUALS_INDEX::PEPARSER_COLHEADERTEXT_COLOR));
 				ImGui::TableSetupColumn("Function");
 				ImGui::TableSetupColumn("Thunk");
 				ImGui::TableSetupColumn("Hint");
@@ -1618,11 +1660,11 @@ void Manager::HandleImports()
 				{
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
-					ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), selected[row].m_FunctionName.c_str());
+					ImGui::TextColored(GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), selected[row].m_FunctionName.c_str());
 					for (int column = 1; column < 3; column++)
 					{
 						ImGui::TableSetColumnIndex(column);
-						ImGui::TextColored(m_DataBaseManager->GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), ucharVecToHexString(selected[row].m_ImportInfo[column - 1].m_Bytes).c_str());
+						ImGui::TextColored(GetColorSetting(VISUALS_INDEX::PEPARSER_TEXT_COLOR), ucharVecToHexString(selected[row].m_ImportInfo[column - 1].m_Bytes).c_str());
 					}
 				}
 			}	
@@ -1691,24 +1733,43 @@ int Manager::SaveFile(const std::string& path)
 	return m_FileBrowser->SaveFile(path);
 }
 
+int Manager::ColorChangeRequest(const std::string& component, float r, float g, float b)
+{
+	std::string COLOR_QUERYSEL_STRING = std::format("'{}'", component);
+	ImVec4 NewColor = { r, g, b, 1.00f };
+
+	for (auto& qs : COLORSETTINGS_QUERYSTRING)
+	{
+		if (COLOR_QUERYSEL_STRING == qs)
+		{
+			m_DataBaseManager->UpdateColorSetting(qs, NewColor);
+			return 0;
+		}
+	}
+	return -1;
+}
+
+void Manager::InterpreterThread()
+{
+	pybind11::scoped_interpreter guard{};
 
 
+	while (true)
+	{
+		std::unique_lock lock(m_InterpreterWorkItemsMutex);
+		m_InterpreterCV.wait(lock, [this] {return m_InterpreterWorkItems.size() != 0; });
+		auto script = m_InterpreterWorkItems.back();
+		m_PythonInterpreter->exec(script);
+		m_InterpreterWorkItems.pop_back();
+	}
 
-
-
+}
 
 
 
 /*
-	This function replaces raw string formatting that is required by pybind11 for executing strings of text. 
-	By surrounding our scripts in newline characters we can avoid using raw strings which are super annoying to work with
+	PYTHON INTERPRETER METHODS
 */
-static std::string format_func(const std::string& format)
-{
-	std::string ret = std::format("\n{}\n", format);
-
-	return ret;
-}
 
 
 interpreter::interpreter(Manager* mgr)
@@ -1725,14 +1786,13 @@ interpreter::~interpreter()
 
 
 
-void interpreter::exec()
+void interpreter::exec(const std::string& script)
 {
 	// Interpreter was initialized in global main()
 
-
 	try
 	{
-		pybind11::exec(format_func(m_ScriptBuffer+1).c_str());
+		pybind11::exec(script.c_str());
 	}
 	catch (const pybind11::error_already_set& e)
 	{

@@ -9,3 +9,7 @@ ManagerSettings::ManagerSettings(std::vector<ImVec4> InitVec)
 ManagerSettings::ManagerSettings()
 {
 }
+
+ManagerSettings::~ManagerSettings()
+{
+}

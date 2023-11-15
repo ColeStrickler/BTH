@@ -52,6 +52,7 @@ struct ManagerSettings
 {
 	ManagerSettings(std::vector<ImVec4> InitVec);
 	ManagerSettings();
+	~ManagerSettings();
 
 	
 	inline ImVec4 GetColorSettings(VISUALS_INDEX index) const { return m_ColorSettings[(int)index]; };

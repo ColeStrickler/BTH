@@ -16,6 +16,7 @@
 #include "..\db\defaultstructs.h"
 #include <mutex>
 #include <iostream>
+#include <condition_variable>
 
 
 #define MAX_SCANNER_DISPLAY 25
@@ -85,7 +86,7 @@ public:
 	void HandleSettingsDisplay();
 	void DisplayVisualSettings();
 	void DisplayPerformanceSettings();
-
+	ImVec4 GetColorSetting(VISUALS_INDEX index);
 
 
 
@@ -148,6 +149,7 @@ public:
 	/*
 		Python Function Bindings
 	*/
+	std::mutex m_FunctionBindingsMutex;
 	inline void SetGlobalOffset(const std::string& offset) { memset(m_OffsetEditorBuffer, 0x00, 9); memcpy(m_OffsetEditorBuffer, offset.c_str(), offset.size()); };
 	inline size_t GetGlobalOffset() const { return m_GlobalOffset; };
 	inline int NewStructure(const std::string& struct_name) { m_MemoryDumpStructureVec.push_back(MemDumpStructure(struct_name)); return m_MemoryDumpStructureVec.size() - 1; };
@@ -157,6 +159,7 @@ public:
 	void DeleteStructure(int struct_id);
 	std::vector<size_t> RequestByteScan(std::vector<unsigned char>& bytes);
 	int SaveFile(const std::string& path);
+	int ColorChangeRequest(const std::string& component, float r, float g, float b);
 
 	
 
@@ -182,6 +185,7 @@ private:
 	// These are all mutex protected ^
 	bool m_bThreadManagerExit;
 
+	
 
 
 	/*
@@ -281,11 +285,11 @@ private:
 	/*
 		PYTHON INTERPRETER
 	*/
-
-
-
-	
-
+	std::thread m_InterpreterThread;
+	std::vector<std::string> m_InterpreterWorkItems;
+	std::mutex m_InterpreterWorkItemsMutex;
+	std::condition_variable m_InterpreterCV;
+	void InterpreterThread();
 
 
 };
@@ -314,7 +318,7 @@ public:
 	interpreter(Manager* mgr);
 	~interpreter();
 
-	void exec();
+	void exec(const std::string& script);
 
 	size_t m_ScriptBufferSize;
 	char* m_ScriptBuffer;

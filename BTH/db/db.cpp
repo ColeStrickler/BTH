@@ -105,7 +105,10 @@ int db_mgr::InsertData(const std::string& query)
 void db_mgr::LoadState()
 {
 	if (m_SavedSettings)
+	{
 		delete m_SavedSettings;
+	}
+		
 	std::vector<ImVec4> SettingsInitVec;
 	for (auto& query_string : COLORSETTINGS_QUERYSTRING)
 	{
@@ -351,6 +354,7 @@ float db_mgr::RetrieveFloat(const std::string& table, const std::string& selecti
 {
 	sqlite3_stmt* stmt;
 	int err;
+	float data_item = 0.0f;
 	auto retrieval_query = FormatRetrievalQuery(table, selection_attribute, selection_criteria);
 	if ((err = sqlite3_prepare_v2(m_DB, retrieval_query.c_str(), -1, &stmt, 0)) == -1)
 	{
@@ -358,19 +362,18 @@ float db_mgr::RetrieveFloat(const std::string& table, const std::string& selecti
 		return 0.0f;
 	}
 
-	while (sqlite3_step(stmt) == SQLITE_ROW) {
-		float data_item = static_cast<float>(sqlite3_column_double(stmt, data_column));
-		sqlite3_finalize(stmt);
-		return data_item;
+	if (sqlite3_step(stmt) == SQLITE_ROW) {
+		data_item = static_cast<float>(sqlite3_column_double(stmt, data_column));
 	}
 	sqlite3_finalize(stmt);
-	return 0.0f;
+	return data_item;;
 }
 
 int db_mgr::RetrieveInt(const std::string& table, const std::string& selection_attribute, const std::string& selection_criteria, int data_column)
 {
 	sqlite3_stmt* stmt;
 	int err;
+	int data_item = 0;
 	auto retrieval_query = FormatRetrievalQuery(table, selection_attribute, selection_criteria);
 	if ((err = sqlite3_prepare_v2(m_DB, retrieval_query.c_str(), -1, &stmt, 0)) == -1)
 	{
@@ -378,19 +381,18 @@ int db_mgr::RetrieveInt(const std::string& table, const std::string& selection_a
 		return 0;
 	}
 
-	while (sqlite3_step(stmt) == SQLITE_ROW) {
+	if (sqlite3_step(stmt) == SQLITE_ROW) {
 		int data_item = sqlite3_column_int(stmt, data_column);
-		sqlite3_finalize(stmt);
-		return data_item;
 	}
 	sqlite3_finalize(stmt);
-	return 0;
+	return data_item;
 }
 
 std::string db_mgr::RetrieveString(const std::string& table, const std::string& selection_attribute, const std::string& selection_criteria, int data_column)
 {
 	sqlite3_stmt* stmt;
 	int err;
+	std::string data_item = "";
 	auto retrieval_query = FormatRetrievalQuery(table, selection_attribute, selection_criteria);
 	if ((err = sqlite3_prepare_v2(m_DB, retrieval_query.c_str(), -1, &stmt, 0)) == -1)
 	{
@@ -398,13 +400,11 @@ std::string db_mgr::RetrieveString(const std::string& table, const std::string& 
 		return "";
 	}
 
-	while (sqlite3_step(stmt) == SQLITE_ROW) {
-		std::string data_item = (const char*)sqlite3_column_text(stmt, data_column);
-		sqlite3_finalize(stmt);
-		return data_item;
+	if (sqlite3_step(stmt) == SQLITE_ROW) {
+		data_item = (const char*)sqlite3_column_text(stmt, data_column);
 	}
 	sqlite3_finalize(stmt);
-	return "";
+	return data_item;
 }
 
 std::vector<saved_struct> db_mgr::RetrieveSavedStructures()
@@ -427,6 +427,7 @@ std::vector<saved_struct> db_mgr::RetrieveSavedStructures()
 		ret.push_back(ss);
 	}
 
+	sqlite3_finalize(stmt);
 	return ret;
 }
 MemDumpStructEntry db_mgr::RetrieveStructMember(const std::string& parent_structure, const std::string& member_index)
@@ -450,7 +451,7 @@ MemDumpStructEntry db_mgr::RetrieveStructMember(const std::string& parent_struct
 		ret.m_Size = sqlite3_column_int(stmt, 5);
 		break;
 	}
-
+	sqlite3_finalize(stmt);
 	return ret;
 }
 
