@@ -4,6 +4,7 @@
 #include <iostream>
 #include <Zydis/Zydis.h>
 #include "../utils/utils.h"
+#include "../pe/pe.h"
 #include <map>
 
 struct DecodedInst
@@ -20,7 +21,7 @@ public:
 	~Decoder();
 
 
-	void DecodeBytes(std::vector<unsigned char> bytes);
+	void DecodeBytes(std::vector<unsigned char> bytes, PEDisector* pe);
 	// offset : instruction
 	std::vector<DecodedInst> m_DecodedBytes;
 	std::map<int, int> m_OffsetToInstIndex;

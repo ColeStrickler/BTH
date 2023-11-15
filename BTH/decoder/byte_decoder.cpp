@@ -20,12 +20,16 @@ Decoder::~Decoder()
 	
 }
 
-void Decoder::DecodeBytes(std::vector<unsigned char> bytes)
+void Decoder::DecodeBytes(std::vector<unsigned char> bytes, PEDisector* pe)
 {
 	m_DecodedBytes.clear();
 	m_OffsetToInstIndex.clear();
 	ZydisDecoder decoder;
-	ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_ADDRESS_WIDTH_64);
+
+	if (pe->m_b64bit)
+		ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_ADDRESS_WIDTH_64);
+	else
+		ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_COMPAT_32, ZYDIS_ADDRESS_WIDTH_32);
 	ZydisFormatter formatter;
 	ZydisFormatterInit(&formatter, ZYDIS_FORMATTER_STYLE_INTEL);
 

@@ -716,15 +716,16 @@ void Manager::DisplayFileNavigator()
 			{
 				m_FileBrowser->SetInputPath(c_str);
 				auto fb_retcode = m_FileBrowser->LoadFile(str);
-				m_Decoder->DecodeBytes(m_FileBrowser->m_FileLoadData);
+				
 
 				if (fb_retcode == FB_RETCODE::FILE_CHANGE_LOAD)
 				{
 					if (m_PEDisector != nullptr)
 						delete m_PEDisector;
 					m_PEDisector = new PEDisector(m_FileBrowser->m_LoadedFileName);
+					
 				}
-
+				m_Decoder->DecodeBytes(m_FileBrowser->m_FileLoadData, m_PEDisector);
 			}
 		}
 	}
@@ -946,7 +947,7 @@ void Manager::HandleHexdumpButtons()
 		if (parse_inst == FB_RETCODE::FILE_CHANGE_LOAD || parse_inst == FB_RETCODE::OFFSET_CHANGE_LOAD)
 		{
 			
-			m_Decoder->DecodeBytes(m_FileBrowser->m_FileLoadData);
+			m_Decoder->DecodeBytes(m_FileBrowser->m_FileLoadData, m_PEDisector);
 		}
 	}
 	
