@@ -84,6 +84,17 @@ void stylewrappers::MultilineText(const ImVec4& BgColor, const ImVec4& TextColor
 
 }
 
+stylewrappers::DisassemblerBackground::DisassemblerBackground(const ImVec4& BgColor)
+{
+	ImGuiStyle& style = ImGui::GetStyle();
+	ImGui::PushStyleColor(ImGuiCol_ChildBg, BgColor);
+}
+
+stylewrappers::DisassemblerBackground::~DisassemblerBackground()
+{
+	ImGui::PopStyleColor();
+}
+
 
 
 stylewrappers::TableStyle::TableStyle(const ImVec4& ColHeaderBgColor, const ImVec4& ColHeaderTextColor)

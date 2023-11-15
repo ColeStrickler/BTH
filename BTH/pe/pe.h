@@ -23,6 +23,8 @@ struct dd_Entry
 	std::string m_Name;
 	std::vector<unsigned char> m_VirtualAddress;
 	std::vector<unsigned char> m_Size;
+	DWORD m_VirtualAddressRaw;
+	DWORD m_SizeRaw;
 };
 
 struct fh_Section
@@ -34,6 +36,7 @@ struct fh_Section
 
 struct fh_FunctionImport
 {
+	DWORD m_RawThunk;
 	std::string m_FunctionName;
 	std::vector<fh_Entry> m_ImportInfo;
 };
@@ -86,7 +89,7 @@ public:
 	void ParseSectionHeaders32(PIMAGE_DOS_HEADER dos);
 	void ParseSectionHeaders64(PIMAGE_DOS_HEADER dos);
 
-	
+	DWORD RVA_ToRaw(DWORD rva);
 	/*
 		We currently are not supporting ordinal imports, we will add this soon
 	*/
@@ -95,6 +98,8 @@ public:
 	void ParseImports64(PIMAGE_DOS_HEADER dos, std::ifstream& file);
 	void ParseRichHeader(PIMAGE_DOS_HEADER dos);
 
+
+	std::string m_LoadFileName;
 	bool m_bValidPEFile;
 	bool m_bSuccessfulDisection;
 	bool m_b64bit;
@@ -106,10 +111,13 @@ public:
 	std::vector<fh_Section> m_ParsedSectionHeaders;
 	std::vector<fh_LibraryImport> m_ParsedImports;
 
-
-
+	IMAGE_DOS_HEADER m_CopiedDos;
+	IMAGE_FILE_HEADER m_CopiedFileHeader;
+	IMAGE_OPTIONAL_HEADER32 m_CopiedOpt32;
+	IMAGE_OPTIONAL_HEADER64 m_CopiedOpt64;
+	std::vector<IMAGE_SECTION_HEADER> m_CopiedSectionHeaders;
 private:
-	
+		
 	
 };
 

@@ -41,9 +41,6 @@ Manager::Manager() : m_HexDumpWidth(475), m_HexDumpHeight(400), m_DecoderWidth(4
 	m_ThreadManagerThread = std::move(t);
 	InitDefaultStructs();
 	m_InterpreterThread = std::thread(&Manager::InterpreterThread, this);
-	
-
-
 }
 
 Manager::~Manager()
@@ -51,7 +48,7 @@ Manager::~Manager()
 	m_bThreadManagerExit = true;
 	m_ThreadManagerThread.join();
 	
-	// We do detach instead of join as it allows us to exit if
+	// We do detach instead of join as it allows us to exit without error if
 	// the script is in an infinite loop
 	m_InterpreterThread.detach();
 }
@@ -63,17 +60,7 @@ Manager::~Manager()
 
 void Manager::RenderUI()
 {
-	if (!m_bShowMemoryDumpView)
-	{
-		ImGui::Columns(3, "global_cols", true);
-	}
-	else
-	{
-		ImGui::Columns(3, "global_cols", true);
-		
-
-	}
-		
+	ImGui::Columns(3, "global_cols", true);
 
 	/*
 		COLUMN 1
@@ -130,7 +117,7 @@ void Manager::RenderUI()
 		*/
 		ImGui::Dummy(ImVec2(100, 20));	// Same size as navigator buttons
 		// WE WILL NEED TO ADD CUSTOM COLOR SETTINGS FOR THIS
-		stylewrappers::MultilineText(GetColorSetting(VISUALS_INDEX::HEXDUMP_BACKGROUND_COLOR), GetColorSetting(VISUALS_INDEX::TEXT_COLOR), \
+		stylewrappers::MultilineText(GetColorSetting(VISUALS_INDEX::INTERPRETER_BACKGROUND_COLOR), GetColorSetting(VISUALS_INDEX::INTERPRETER_TEXT_COLOR), \
 			m_PythonInterpreter->m_ScriptBuffer, 8192, ImVec2(WINDOW_WIDTH / 3, WINDOW_HEIGHT / 2 - 100));
 
 		if (stylewrappers::Button("Run", GetColorSetting(VISUALS_INDEX::BUTTON_COLOR)))
@@ -1014,8 +1001,10 @@ void Manager::HandleDecoder()
 	buttonSize.y = ImGui::CalcTextSize("Select File").y + ImGui::GetStyle().FramePadding.y * 2;
 
 	ImGui::Dummy(buttonSize); // Add 10 units of padding
-	ImGui::BeginChild("DisassemblyRegion", ImVec2(WINDOW_WIDTH/3 - 17, WINDOW_HEIGHT/2 - 75), true);
+	stylewrappers::DisassemblerBackground DISASSEMBLER_BG_COLOR(GetColorSetting(VISUALS_INDEX::DISASSEMBLY_BACKGROUND_COLOR));
+	ImGui::BeginChild("DisassemblyRegion", ImVec2(WINDOW_WIDTH/3 - 17, WINDOW_HEIGHT/2 - 75), false);
 
+	
 	auto offset = m_Decoder->m_OffsetToInstIndex[m_GlobalOffset];
 
 	for (int i = offset; i < offset + m_DecoderNumInstructionsDisplayed
@@ -1676,6 +1665,22 @@ void Manager::HandleImports()
 	ImGui::EndChild();
 }
 
+int Manager::HandleFileLoad(const std::string& path)
+{
+	auto ret_code = m_FileBrowser->LoadFile(path);
+	if (ret_code != FB_RETCODE::FILE_CHANGE_LOAD)
+		return -1;
+	else
+	{
+		if (m_PEDisector != nullptr)
+			delete m_PEDisector;
+		m_PEDisector = new PEDisector(m_FileBrowser->m_LoadedFileName);
+
+	}
+	m_Decoder->DecodeBytes(m_FileBrowser->m_FileLoadData, m_PEDisector);
+	return 0;
+}
+
 int Manager::GetStructureId(const std::string& struct_name) const
 {
 	int i = 0;
@@ -1748,6 +1753,14 @@ int Manager::ColorChangeRequest(const std::string& component, float r, float g, 
 		}
 	}
 	return -1;
+}
+
+DecodedInst Manager::GetOpcode(int offset)
+{
+	if (m_Decoder->m_OffsetToInstIndex.find(offset) == m_Decoder->m_OffsetToInstIndex.end())
+		return {0, 0, ""};
+	int index = m_Decoder->m_OffsetToInstIndex[offset];
+	return m_Decoder->m_DecodedBytes[index];
 }
 
 void Manager::InterpreterThread()

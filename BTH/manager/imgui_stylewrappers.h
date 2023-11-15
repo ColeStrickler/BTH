@@ -19,13 +19,20 @@ namespace stylewrappers
 
 	void MultilineText(const ImVec4& BgColor, const ImVec4& TextColor, char* Buffer, size_t BufferSize, ImVec2 WindowSize);
 
+	class DisassemblerBackground
+	{
+	public:
+		DisassemblerBackground(const ImVec4& BgColor);
+		~DisassemblerBackground();
+	};
+	 
 
 	class TableStyle
 	{
 	public:
 		TableStyle(const ImVec4& ColHeaderBgColor, const ImVec4& ColHeaderTextColor);
 		~TableStyle();
-
+	
 
 	private:
 		ImVec4 m_OriginalColHeaderColor;

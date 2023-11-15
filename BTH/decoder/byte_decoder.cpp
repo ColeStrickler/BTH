@@ -55,6 +55,7 @@ void Decoder::DecodeBytes(std::vector<unsigned char> bytes, PEDisector* pe)
 		{
 			decoded.m_Offset = offset;
 			decoded.m_DecodedInstruction = inst;
+			decoded.m_OpcodeSize = instruction.length;
 			m_DecodedBytes.push_back(decoded);
 			
 		}
@@ -67,6 +68,7 @@ void Decoder::DecodeBytes(std::vector<unsigned char> bytes, PEDisector* pe)
 			}
 			decoded.m_Offset = offset;
 			decoded.m_DecodedInstruction = invalid_bytes;
+			decoded.m_OpcodeSize = instruction.length;
 			m_DecodedBytes.push_back(decoded);
 			
 		}

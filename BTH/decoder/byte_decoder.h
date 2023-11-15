@@ -10,6 +10,7 @@
 struct DecodedInst
 {
 	int m_Offset;
+	int m_OpcodeSize;
 	std::string m_DecodedInstruction;
 };
 

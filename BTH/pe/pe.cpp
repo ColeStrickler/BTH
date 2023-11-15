@@ -131,7 +131,7 @@ static DWORD Rva2Offset32(DWORD Rva, PIMAGE_SECTION_HEADER pSectionCopy, PIMAGE_
 	during display time in the GUI
 */
 
-PEDisector::PEDisector(const std::string& loadFile)
+PEDisector::PEDisector(const std::string& loadFile) : m_LoadFileName(loadFile)
 {
 	/*
 		We need to open the file again here because in some of the RVA->RawOffset values we get during a parse
@@ -179,7 +179,7 @@ void PEDisector::ParseDosHeader(PIMAGE_DOS_HEADER dos)
 	fhInsertEntry((unsigned char*)&dos->e_magic,		sizeof(dos->e_magic),			"e_magic", m_ParsedDosHeader,		offsetof(IMAGE_DOS_HEADER,e_magic));
 	fhInsertEntry((unsigned char*)&dos->e_cblp,		sizeof(dos->e_cblp),				"e_cblp", m_ParsedDosHeader,		offsetof(IMAGE_DOS_HEADER,e_cblp));
 	fhInsertEntry((unsigned char*)&dos->e_cp,		sizeof(dos->e_cp),					"e_cp", m_ParsedDosHeader,			offsetof(IMAGE_DOS_HEADER,e_cp));
-	fhInsertEntry((unsigned char*)&dos->e_crlc,		sizeof(dos->e_crlc),				"e_rlc", m_ParsedDosHeader,			offsetof(IMAGE_DOS_HEADER,e_crlc));
+	fhInsertEntry((unsigned char*)&dos->e_crlc,		sizeof(dos->e_crlc),				"e_crlc", m_ParsedDosHeader,			offsetof(IMAGE_DOS_HEADER,e_crlc));
 	fhInsertEntry((unsigned char*)&dos->e_cparhdr,	sizeof(dos->e_cparhdr),				"e_cparhdr", m_ParsedDosHeader,		offsetof(IMAGE_DOS_HEADER,e_cparhdr));
 	fhInsertEntry((unsigned char*)&dos->e_minalloc,	sizeof(dos->e_minalloc),			"e_minalloc", m_ParsedDosHeader,	offsetof(IMAGE_DOS_HEADER,e_minalloc));
 	fhInsertEntry((unsigned char*)&dos->e_maxalloc,	sizeof(dos->e_maxalloc),			"e_maxalloc", m_ParsedDosHeader,	offsetof(IMAGE_DOS_HEADER,e_maxalloc));
@@ -195,6 +195,7 @@ void PEDisector::ParseDosHeader(PIMAGE_DOS_HEADER dos)
 	fhInsertEntry((unsigned char*)&dos->e_oeminfo,	sizeof(dos->e_oeminfo),				"e_oeminfo", m_ParsedDosHeader,		offsetof(IMAGE_DOS_HEADER,e_oeminfo));
 	fhInsertEntry((unsigned char*)&dos->e_res2,		sizeof(dos->e_res2),				"e_res2", m_ParsedDosHeader,		offsetof(IMAGE_DOS_HEADER,e_res2));
 	fhInsertEntry((unsigned char*)&dos->e_lfanew,	sizeof(dos->e_lfanew),				"e_lfanew", m_ParsedDosHeader,		offsetof(IMAGE_DOS_HEADER,e_lfanew));
+	memcpy(&m_CopiedDos, dos, sizeof(IMAGE_DOS_HEADER));
 }
 
 void PEDisector::ParseFileHeader(PIMAGE_FILE_HEADER fh, PIMAGE_DOS_HEADER dos)
@@ -206,6 +207,7 @@ void PEDisector::ParseFileHeader(PIMAGE_FILE_HEADER fh, PIMAGE_DOS_HEADER dos)
 	fhInsertEntry((unsigned char*)&fh->NumberOfSymbols, sizeof(fh->NumberOfSymbols), "NumberOfSymbols", m_ParsedFileHeader,					dos->e_lfanew + sizeof(DWORD) + offsetof(IMAGE_FILE_HEADER, NumberOfSymbols));
 	fhInsertEntry((unsigned char*)&fh->SizeOfOptionalHeader, sizeof(fh->SizeOfOptionalHeader), "SizeOfOptionalHeader", m_ParsedFileHeader,	dos->e_lfanew + sizeof(DWORD) + offsetof(IMAGE_FILE_HEADER, SizeOfOptionalHeader));
 	fhInsertEntry((unsigned char*)&fh->Characteristics, sizeof(fh->Characteristics), "Characteristics", m_ParsedFileHeader,					dos->e_lfanew + sizeof(DWORD) + offsetof(IMAGE_FILE_HEADER, Characteristics));
+	memcpy(&m_CopiedFileHeader, fh, sizeof(IMAGE_FILE_HEADER));
 }
 
 void PEDisector::ParseOptionalHeader32(PIMAGE_OPTIONAL_HEADER32 opt, PIMAGE_DOS_HEADER dos)
@@ -238,6 +240,7 @@ void PEDisector::ParseOptionalHeader32(PIMAGE_OPTIONAL_HEADER32 opt, PIMAGE_DOS_
 	fhInsertEntry((unsigned char*)&opt->SizeOfHeapCommit,			sizeof(opt->SizeOfHeapCommit),				"SizeOfHeapCommit", m_ParsedOptionalHeader,				dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, SizeOfHeapCommit));
 	fhInsertEntry((unsigned char*)&opt->LoaderFlags,				sizeof(opt->LoaderFlags),						"LoaderFlags", m_ParsedOptionalHeader,				dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, LoaderFlags));
 	fhInsertEntry((unsigned char*)&opt->NumberOfRvaAndSizes,		sizeof(opt->NumberOfRvaAndSizes),				"NumberOfRvaAndSizes", m_ParsedOptionalHeader,		dos->e_lfanew + offsetof(IMAGE_NT_HEADERS32,OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER32, NumberOfRvaAndSizes));
+	memcpy(&m_CopiedOpt32, opt, sizeof(IMAGE_OPTIONAL_HEADER32));
 	ParseDataDirectories(opt->DataDirectory, opt->NumberOfRvaAndSizes);
 }
 
@@ -271,6 +274,7 @@ void PEDisector::ParseOptionalHeader64(PIMAGE_OPTIONAL_HEADER64 opt, PIMAGE_DOS_
 	fhInsertEntry((unsigned char*)&opt->SizeOfHeapCommit, sizeof(opt->SizeOfHeapCommit), "SizeOfHeapCommit", m_ParsedOptionalHeader,									dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, SizeOfHeapCommit));
 	fhInsertEntry((unsigned char*)&opt->LoaderFlags, sizeof(opt->LoaderFlags), "LoaderFlags", m_ParsedOptionalHeader,													dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, LoaderFlags));
 	fhInsertEntry((unsigned char*)&opt->NumberOfRvaAndSizes, sizeof(opt->NumberOfRvaAndSizes), "NumberOfRvaAndSizes", m_ParsedOptionalHeader,							dos->e_lfanew + offsetof(IMAGE_NT_HEADERS, OptionalHeader) + offsetof(IMAGE_OPTIONAL_HEADER, NumberOfRvaAndSizes));
+	memcpy(&m_CopiedOpt64, opt, sizeof(IMAGE_OPTIONAL_HEADER64));
 	ParseDataDirectories(opt->DataDirectory, opt->NumberOfRvaAndSizes);
 }
 
@@ -304,6 +308,8 @@ void PEDisector::ParseDataDirectories(PIMAGE_DATA_DIRECTORY dd, DWORD num_dd)
 		entry.m_Name = DataDirIndexToString(i);
 		toByteVector((unsigned char*)&dd_data.Size, sizeof(dd_data.Size), entry.m_Size);
 		toByteVector((unsigned char*)&dd_data.VirtualAddress, sizeof(dd_data.VirtualAddress), entry.m_VirtualAddress);
+		entry.m_VirtualAddressRaw = dd_data.VirtualAddress;
+		entry.m_SizeRaw = dd_data.Size;
 		m_ParsedDataDirectory_Opt.push_back(entry);
 	}
 }
@@ -314,6 +320,7 @@ void PEDisector::ParseDataDirectories(PIMAGE_DATA_DIRECTORY dd, DWORD num_dd)
 
 void PEDisector::ParseSectionHeaders(PIMAGE_DOS_HEADER dos)
 {
+	m_CopiedSectionHeaders.clear();
 	if (m_b64bit)
 		ParseSectionHeaders64(dos);
 	else
@@ -327,6 +334,7 @@ void PEDisector::ParseSectionHeaders32(PIMAGE_DOS_HEADER dos)
 	auto sectionAddr = ((uintptr_t)&nt->OptionalHeader + (uintptr_t)nt->FileHeader.SizeOfOptionalHeader);
 	for (int i = 0; i < numSections; i++) {
 		auto section = (PIMAGE_SECTION_HEADER)sectionAddr;
+		m_CopiedSectionHeaders.push_back(*section);
 		fh_Section entry;
 		entry.m_Name = std::string((char*)section->Name);
 		fhInsertEntry((unsigned char*)&section->Misc.PhysicalAddress, sizeof(section->Misc.PhysicalAddress), "Misc.PhysicalAddress", entry.m_SectionData);
@@ -356,6 +364,7 @@ void PEDisector::ParseSectionHeaders64(PIMAGE_DOS_HEADER dos)
 	auto sectionAddr = ((uintptr_t)&nt->OptionalHeader + (uintptr_t)nt->FileHeader.SizeOfOptionalHeader);
 	for (int i = 0; i < numSections; i++) {
 		auto section = (PIMAGE_SECTION_HEADER)sectionAddr;
+		m_CopiedSectionHeaders.push_back(*section);
 		fh_Section entry;
 		entry.m_Name = std::string((char*)section->Name);
 		fhInsertEntry((unsigned char*)&section->Misc.PhysicalAddress, sizeof(section->Misc.PhysicalAddress),	"Misc.PhysicalAddress", entry.m_SectionData);
@@ -376,6 +385,39 @@ void PEDisector::ParseSectionHeaders64(PIMAGE_DOS_HEADER dos)
 		//GetHashes(Base + section->PointerToRawData, section->SizeOfRawData, &newSection.HashInfo);
 		sectionAddr = sectionAddr + sizeof(IMAGE_SECTION_HEADER);
 	}
+}
+
+DWORD PEDisector::RVA_ToRaw(DWORD rva)
+{
+	if (!m_bValidPEFile)
+		return 0;
+
+	// We have to reload the file so we can do all this jazz
+	// as we do not save the bytes at the beginning of the file anywhere
+	std::ifstream file(m_LoadFileName, std::ios::binary);
+	if (!file.is_open())
+		return 0;
+	file.seekg(0, std::ios::end);
+	std::streampos fileSize = file.tellg();
+	file.seekg(0, std::ios::beg);
+	auto fs = static_cast<int>(fileSize);
+	utils::NewBuffer filebuf(INITIAL_PE_LOAD);
+	auto load = min(INITIAL_PE_LOAD, fs);
+	file.read((char*)filebuf.Get(), load);
+
+	auto base = filebuf.Get();
+	auto dos = (PIMAGE_DOS_HEADER)filebuf.Get();
+
+	if (m_b64bit)
+	{
+		auto nt = (PIMAGE_NT_HEADERS64)((BYTE*)dos + dos->e_lfanew);
+		return Rva2Offset(rva, IMAGE_FIRST_SECTION(nt), nt);
+	}
+	else
+	{
+		auto nt = (PIMAGE_NT_HEADERS32)((BYTE*)dos + dos->e_lfanew);
+		return Rva2Offset32(rva, IMAGE_FIRST_SECTION(nt), nt);
+	}	
 }
 
 
@@ -468,6 +510,7 @@ void PEDisector::ParseImports32(PIMAGE_DOS_HEADER dos, std::ifstream& file)
 					}
 
 					funcImport.m_FunctionName = function;
+					funcImport.m_RawThunk = thunkData.u1.AddressOfData;
 					fhInsertEntry((unsigned char*)&thunkData.u1.AddressOfData, sizeof(IMAGE_THUNK_DATA32), "Thunk", funcImport.m_ImportInfo);
 					fhInsertEntry((unsigned char*)&hint, sizeof(WORD), "Hint", funcImport.m_ImportInfo);
 					libImport.m_FunctionImports.push_back(funcImport);
@@ -566,6 +609,7 @@ void PEDisector::ParseImports64(PIMAGE_DOS_HEADER dos, std::ifstream& file)
 					}
 					
 					funcImport.m_FunctionName = function;
+					funcImport.m_RawThunk = thunkData.u1.AddressOfData;
 					fhInsertEntry((unsigned char*)&thunkData.u1.AddressOfData, sizeof(ULONGLONG), "Thunk", funcImport.m_ImportInfo);
 					fhInsertEntry((unsigned char*)&hint, sizeof(WORD), "Hint", funcImport.m_ImportInfo);
 					libImport.m_FunctionImports.push_back(funcImport); 

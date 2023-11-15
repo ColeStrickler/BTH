@@ -9,10 +9,11 @@
 
 #include "../Dependencies/glew.h"
 #include "../Dependencies/glfw3.h"
+#include "bind_helpers.h"
+
 
 
 #define ASSERT(x) if(!(x)) __debugbreak();
-
 
 
 namespace utils

@@ -151,7 +151,8 @@ public:
 	*/
 	std::mutex m_FunctionBindingsMutex;
 	inline void SetGlobalOffset(const std::string& offset) { memset(m_OffsetEditorBuffer, 0x00, 9); memcpy(m_OffsetEditorBuffer, offset.c_str(), offset.size()); };
-	inline size_t GetGlobalOffset() const { return m_GlobalOffset; };
+	int HandleFileLoad(const std::string& path);
+	inline size_t GetGlobalOffset() const { return m_FileBrowser->m_CurrentBounds[0]; };
 	inline int NewStructure(const std::string& struct_name) { m_MemoryDumpStructureVec.push_back(MemDumpStructure(struct_name)); return m_MemoryDumpStructureVec.size() - 1; };
 	int GetStructureId(const std::string& struct_name) const;
 	int AddStructMember(int struct_id, std::string member_name, int size, int display_type);
@@ -160,7 +161,7 @@ public:
 	std::vector<size_t> RequestByteScan(std::vector<unsigned char>& bytes);
 	int SaveFile(const std::string& path);
 	int ColorChangeRequest(const std::string& component, float r, float g, float b);
-
+	DecodedInst GetOpcode(int offset);
 	
 
 	interpreter* m_PythonInterpreter;
@@ -327,4 +328,6 @@ private:
 
 
 };
+
+
 
