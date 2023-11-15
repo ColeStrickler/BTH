@@ -1,4 +1,4 @@
-# The File and Memory Dump analysis Tool for hackers
+# Hackable file and memory dump analysis tool
 
 ## For info on how to use and API documentation please see the BTH Wiki: https://colestrickler.github.io/BTH-Wiki/
 
