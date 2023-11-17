@@ -24,6 +24,7 @@ for dir in sh:
 	dir_start = mgr.rvaToRaw(dir.VirtualAddress)
 	dir_size = dir.SizeOfRawData
 	section_bytes = b''
+	# gather all bytes from section
 	for i in range(dir_size):
 		byte = bytes.fromhex(mgr.GetByte(dir_start + i))
 		
